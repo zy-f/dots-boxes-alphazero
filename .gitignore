@@ -1,6 +1,6 @@
 # use - as prefix for files and folders you want to be local to your repo
--*/
--*
+___*/
+___*
 
 __pycache__/
 .*
