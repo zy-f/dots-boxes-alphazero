@@ -160,6 +160,15 @@ class DnBBoard:
         flipped = [r[:,::-1][[2,1,0,3]] for r in self.rings]
         symmetries += [[r[rot] for r in flipped] for rot in index_rotations]
         return symmetries
+    
+    def end_value(self):
+        '''
+        returns:
+        - None if game is not yet complete
+        - +1 if player 1 wins
+        - -1 if player 2 wins
+        '''
+        pass
 
 
 def debug():
