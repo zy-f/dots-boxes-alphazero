@@ -16,7 +16,7 @@ class DnBStr: # string representation definitions for dots and boxes board
     BLANK = '   '
     V_EDGE = ' | ' 
     H_EDGE = '---'
-    DOT = ' o '
+    DOT = ' • '
 
 box_sides = {
     't': (-1, 0),
@@ -41,11 +41,6 @@ class DnBBoard:
                         board[i][j] = ' '+chars.pop()+' '
         return board
     
-    def display_char(side_ix, value, ring_ix=0):
-        if not value:
-            return DnBStr.BLANK
-        return DnBStr.H_EDGE if (side_ix % 2) == (ring_ix % 2) else DnBStr.V_EDGE
-    
     def action_map(nb):
         mapping = []
         for ring_ix in range(nb):
@@ -56,6 +51,22 @@ class DnBBoard:
     def illegal_move_warning():
         print('move not legal, please try again')
     
+    def ring_board_pairs(nb):
+        nchar = 2*nb + 1
+        pairs = []
+        for r_ix in range(nb):
+            sidelen = r_ix + 1
+            ix_start = nb - sidelen
+            ix_end = nchar - ix_start - 1
+            for i in range(sidelen):
+                pairs += [
+                    ((ix_start, ix_start+(i*2)+1), (r_ix, 0, i)),
+                    ((ix_start+(i*2)+1, ix_end), (r_ix, 1, i)),
+                    ((ix_end, ix_start+(i*2)+1), (r_ix, 2, sidelen-i-1)),
+                    ((ix_start+(i*2)+1, ix_start), (r_ix, 3, sidelen-i-1))
+                ]
+        return pairs
+    
     def board_from_rings(rings):
         nb = len(rings)
         nchar = 2*nb + 1
@@ -64,7 +75,7 @@ class DnBBoard:
             sidelen = ring.shape[1]
             ix_start = nb - 1 - ring_ix
             ix_end = nchar - ix_start - 1 # to make it non-inclusive
-            getchar = lambda v, side: DnBBoard.display_char(side, v, ring_ix=ring_ix)
+            getchar = lambda v, side: DnBBoard.display_char(nb, side, v, ring_ix=ring_ix)
             for i in range(sidelen):
                 board[ix_start][ix_start+(i*2)+1] = getchar(ring[0, i], 0) # top edge
                 board[ix_start+(i*2)+1][ix_end] = getchar(ring[1, i], 1) # right edge
@@ -89,25 +100,30 @@ class DnBBoard:
             rings.append(ring)
         return rings
     
+    def display_char(nb, side_ix, value, ring_ix=0):
+        if not value:
+            return DnBStr.BLANK
+        is_hz = (side_ix % 2) != ((nb - ring_ix) % 2)
+        return DnBStr.H_EDGE if is_hz else DnBStr.V_EDGE
+    
     def str_repr_board(board):
         return '\n'.join([''.join(row) for row in board])
     ## STATIC FUNCTIONS END
 
-    def __init__(self, num_boxes=3):
+    def __init__(self, num_boxes=3): # rings=None, board=None -> implement later!!
         self.nb = num_boxes
         self.nchar = 2 * self.nb + 1
         self.board = DnBBoard.blank_board(self.nchar)
         self.rings = [np.zeros((4,i+1)) for i in range(self.nb)] # innermost ring first
         self.action_mapping = DnBBoard.action_map(self.nb)
+        edge_pairs = DnBBoard.ring_board_pairs(self.nb)
+        self.board2ring = {b_ix: r_ix for (b_ix, r_ix) in edge_pairs} 
+        self.ring2board = {r_ix: b_ix for (b_ix, r_ix) in edge_pairs}
+        self.scores = [0,0] # number of boxes per player
+        self.player_turn = 0 # 0 or 1
     
     def __str__(self):
-        return DnBBoard.str_repr_board(self.board)
-    
-    def update_board_from_rings(self):
-        self.board = DnBBoard.board_from_rings(self.rings)
-    
-    def update_rings_from_board(self):
-        self.rings = DnBBoard.rings_from_board(self.board)
+        return DnBBoard.str_repr_board(self.board)+'\n'+str(self.scores)
     
     def get_board_state(self):
         board_state = []
@@ -124,7 +140,14 @@ class DnBBoard:
             board_state.append(row)
         return np.array(board_state, dtype=np.float32)
     
+    def update_scores(self):
+        state = self.get_board_state()
+        n_boxes = (state.sum(axis=2) == 4).sum()
+        if n_boxes > sum(self.scores):
+            self.scores[self.player_turn] += 1
+    
     def play(self, move): # returns True if move is legal, False otherwise
+        y, x = (None, None)
         if isinstance(move, tuple) or isinstance(move, list): # user-friendly input
             if len(move) != 2:
                 DnBBoard.illegal_move_warning()
@@ -137,15 +160,21 @@ class DnBBoard:
                 return False
             dy, dx = box_sides[side]
             root_y, root_x = (box_number//self.nb)*2+1, (box_number%self.nb)*2+1
-            self.board[root_y+dy][root_x+dx] = DnBStr.V_EDGE if side in 'lr' else DnBStr.H_EDGE
-            self.update_rings_from_board()
+            y = root_y+dy
+            x = root_x+dx
+            self.board[y][x] = DnBStr.V_EDGE if side in 'lr' else DnBStr.H_EDGE
+            ring, side, sub_ix = self.board2ring[(root_y+dy, root_x+dx)]
+            self.rings[ring][side, sub_ix] = True
         else: # numerical action index
-            if (move < 0) or (move > len(self.action_mapping)):
+            if (move < 0) or (move >= len(self.action_mapping)):
                 DnBBoard.illegal_move_warning()
                 return False
             ring, side, sub_ix = self.action_mapping[move]
             self.rings[ring][side, sub_ix] = True
-            self.update_board_from_rings()
+            y, x = self.ring2board[(ring, side, sub_ix)]
+            self.board[y][x] = DnBBoard.display_char(self.nb, side, True, ring_ix=ring)
+        self.update_scores()
+        self.player_turn = int(not self.player_turn) # change turn
         return True
     
     def legal_action_mask(self):
@@ -167,34 +196,40 @@ class DnBBoard:
         - None if game is not yet complete
         - +1 if player 1 wins
         - -1 if player 2 wins
+        - +0 if draw
         '''
-        pass
+        diff = self.scores[0] - self.scores[1]
+        return None if sum(self.scores) < self.nb**2 else np.sign(diff).item()
 
 
 def debug():
-    nb = 3
+    nb = 2
     board = DnBBoard(num_boxes=nb)
-    move_space = nb*(nb+1) * 2
-    moves = np.random.choice(move_space, size=10, replace=False)
-    for move in moves:
-        board.play(move)
-        print('\n')
-        print(board)
-    print('\n\n==========\n\n')
-    for sym in board.get_symmetries():
-        print(DnBBoard.str_repr_board(DnBBoard.board_from_rings(sym)))
-        print('\n')
-    # while 1:
-    #     inp = input("play: ").strip()
-    #     if inp.lower() == 'q':
-    #         break
-    #     try:
-    #         move = int(inp)
-    #     except:
-    #         move = inp.split()
+    print(board)
+    # move_space = nb*(nb+1) * 2
+    # moves = np.random.choice(move_space, size=10, replace=False)
+    # for move in moves:
     #     board.play(move)
+    #     print('\n')
     #     print(board)
-    #     print(board.legal_action_mask())
+    # print('\n\n==========\n\n')
+    # for sym in board.get_symmetries():
+    #     print(DnBBoard.str_repr_board(DnBBoard.board_from_rings(sym)))
+    #     print('\n')
+    while 1:
+        inp = input(f"player {board.player_turn+1}: ").strip()
+        if inp.lower() == 'q':
+            break
+        try:
+            move = int(inp)
+        except:
+            move = inp.split()
+        board.play(move)
+        print(board)
+        z = board.end_value()
+        if z is not None:
+            print(z)
+            break
 
 
 if __name__ == "__main__":
