@@ -8,8 +8,12 @@ class DnBNet(nn.Module):
     '''
     Defines a model architecture for our AlphaZero policy/value predictive network. 
     - init: define appropriate parameters given board size and anything else we want to tune
-    - forward: given a batch of board states OR single board state, return
+    - forward: given a batch of board states, return
         - policy vector p containing probabilities in the action space (legal moves handled in mcts)
         - scalar state evaluation z (+1 if 100% winning, -1 if 100% losing -> use a tanh)
+    - predict: given a single (board state, scores) tuple (elements NOT given as tensors), return
+        - policy vector p containing probabilities in the action space (legal moves handled in mcts)
+        - scalar state evaluation z (+1 if 100% winning, -1 if 100% losing -> use a tanh)
+        - NOTE: values should be returned as numpy arrays, not tensors
     '''
     pass
