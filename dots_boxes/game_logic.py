@@ -108,24 +108,69 @@ class DnBBoard:
     
     def str_repr_board(board):
         return '\n'.join([''.join(row) for row in board])
+    
+    def get_symmetrical_states(tree_state):
+        # make rings
+        ring_state, scores = tree_state
+        flat_rings = [int(c) for c in ring_state]
+        nb = int(np.sqrt(len(flat_rings) // 2))
+        rings = []
+        for i in range(nb):
+            rings.append(np.array(flat_rings[:4*(i+1)]).reshape(4,i+1))
+            flat_rings = flat_rings[4*(i+1):]
+        # rotational symmetries
+        index_rotations = [[i%4, (i+1)%4, (i+2)%4, (i+3)%4] for i in range(4)]
+        symmetries = [[r[rot] for r in rings] for rot in index_rotations]
+        # perform mirror image flip
+        flipped = [r[:,::-1][[2,1,0,3]] for r in rings]
+        symmetries += [[r[rot] for r in flipped] for rot in index_rotations]
+        # map symmetrical rings to equivalent tree states
+        sym_states = []
+        for sym in symmetries:
+            flat = np.concatenate([r.flatten() for r in sym]).astype(int)
+            sym_states.append((''.join([str(x) for x in flat]), scores))
+        return sym_states
+
     ## STATIC FUNCTIONS END
 
-    def __init__(self, num_boxes=3): # rings=None, board=None -> implement later!!
-        self.nb = num_boxes
-        self.nchar = 2 * self.nb + 1
-        self.board = DnBBoard.blank_board(self.nchar)
-        self.rings = [np.zeros((4,i+1)) for i in range(self.nb)] # innermost ring first
+    def __init__(self, num_boxes=3, tree_state=None):
+        if tree_state is not None:
+            ring_state, scores = tree_state
+            flat_rings = [int(c) for c in ring_state]
+            # recall that (# elems) = 2 * n(n+1) because it's 4 * (sequential sum)
+            self.nb = int(np.sqrt(len(flat_rings) // 2))
+            self.nchar = 2 * self.nb + 1
+            self.player_turn = sum(flat_rings) % 2
+            # make rings
+            self.rings = []
+            for i in range(self.nb):
+                self.rings.append(np.array(flat_rings[:4*(i+1)]).reshape(4,i+1))
+                flat_rings = flat_rings[4*(i+1):]
+            self.board = DnBBoard.board_from_rings(self.rings)
+            self.scores = list(scores)
+        else:
+            self.nb = num_boxes
+            self.nchar = 2 * self.nb + 1
+            self.board = DnBBoard.blank_board(self.nchar)
+            self.rings = [np.zeros((4,i+1)) for i in range(self.nb)] # innermost ring first
+            self.scores = [0,0] # number of boxes per player
+            self.player_turn = 0 # 0 or 1
         self.action_mapping = DnBBoard.action_map(self.nb)
         edge_pairs = DnBBoard.ring_board_pairs(self.nb)
         self.board2ring = {b_ix: r_ix for (b_ix, r_ix) in edge_pairs} 
         self.ring2board = {r_ix: b_ix for (b_ix, r_ix) in edge_pairs}
-        self.scores = [0,0] # number of boxes per player
-        self.player_turn = 0 # 0 or 1
+    
+    def clone(self):
+        return self.__class__(tree_state=self.tree_state())
     
     def __str__(self):
         return DnBBoard.str_repr_board(self.board)+'\n'+str(self.scores)
     
-    def get_board_state(self):
+    def tree_state(self):
+        flattened_rings = np.concatenate([r.flatten() for r in self.rings]).astype(int)
+        return ''.join([str(x) for x in flattened_rings]), tuple(self.scores)
+    
+    def nn_state(self):
         board_state = []
         for i in range(self.nb):
             row = []
@@ -138,10 +183,10 @@ class DnBBoard:
                     self.board[root_y][root_x-1] != DnBStr.BLANK, # left edge
                 ])
             board_state.append(row)
-        return np.array(board_state, dtype=np.float32)
+        return np.array(board_state, dtype=np.float32), tuple(self.scores)
     
     def update_scores(self):
-        state = self.get_board_state()
+        state, _ = self.nn_state()
         n_boxes = (state.sum(axis=2) == 4).sum()
         if n_boxes > sum(self.scores):
             self.scores[self.player_turn] += 1
@@ -178,17 +223,8 @@ class DnBBoard:
         return True
     
     def legal_action_mask(self):
-        flattened_rings = np.concatenate([r.flatten() for r in self.rings])
+        flattened_rings = np.concatenate([r.flatten() for r in self.rings]).astype(int)
         return (flattened_rings == 0)
-    
-    def get_symmetries(self):
-        # rotational symmetries
-        index_rotations = [[i%4, (i+1)%4, (i+2)%4, (i+3)%4] for i in range(4)]
-        symmetries = [[r[rot] for r in self.rings] for rot in index_rotations]
-        # perform mirror image flip
-        flipped = [r[:,::-1][[2,1,0,3]] for r in self.rings]
-        symmetries += [[r[rot] for r in flipped] for rot in index_rotations]
-        return symmetries
     
     def end_value(self):
         '''
@@ -217,6 +253,7 @@ def debug():
     #     print(DnBBoard.str_repr_board(DnBBoard.board_from_rings(sym)))
     #     print('\n')
     while 1:
+        print(board.tree_board_state())
         inp = input(f"player {board.player_turn+1}: ").strip()
         if inp.lower() == 'q':
             break
