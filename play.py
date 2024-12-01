@@ -2,36 +2,44 @@
 file to allow interaction between user and a trained alphazero instance
 basically the inference-time file that lets you play vs the bot user
 '''
-from dots_boxes.nnet import DnBNet
-from dots_boxes.game_logic import DnBBoard
+import dots_boxes
+from mcts import MCTS
+import numpy as np
 
-def request_user_move():
-    legal_move = False
-    while not legal_move:
-        inp = input("Your move: ").strip()
-        move = inp.split()
-        legal_move = board.play(move)
+GAMES = {
+    'dnb': dots_boxes
+}
 
-def dnb_instructions():
-    print("Let's play dots and boxes!")
-    print("Move format: <box label> [space] <side ([t]op/[b]ottom/[l]eft/[r]ight)>")
-    print("For example, `a b` would select the bottom edge of box a")
+class Player:
+    is_human = False
+    label = "null"
+    def move(self, board):
+        pass
 
-def turn_order():
-    inp = input("Would you like to go first (y/n)? ")
-    user_first = inp.lower().startswith('y')
-    return user_first
+class AlphaZero(Player):
+    label = "AlphaZero (bot)"
+    def __init__(self, game='dnb'):
+        self.net = GAMES[game].Network(pretrained=True)
+        self.mcts = MCTS(params={'tau_pi': 0})
 
-def play():
+    def move(self, board):
+        policy = self.mcts.search(board, self.net)
+        return np.argmax(policy)
+
+
+def play(game='dnb', verbose=False):
     '''
     We'll probably want either a regular or command-line argument to choose 
     the trained network to play against.
     '''
-    dnb_instructions()
-    user_first = turn_order()
-    pass
 
+    game = GAMES[game].Game()
+    while not game.finished():
+        if verbose or game.human_turn():
+            game.display()
+        game.play_turn()
+    game.display()
 
 
 if __name__ == '__main__':
-    play_dnb()
+    play()

@@ -164,7 +164,7 @@ class DnBBoard:
         return self.__class__(tree_state=self.tree_state())
     
     def __str__(self):
-        return DnBBoard.str_repr_board(self.board)+'\n'+str(self.scores)
+        return DnBBoard.str_repr_board(self.board)
     
     def tree_state(self):
         flattened_rings = np.concatenate([r.flatten() for r in self.rings]).astype(int)
@@ -186,10 +186,13 @@ class DnBBoard:
         return np.array(board_state, dtype=np.float32), tuple(self.scores)
     
     def update_scores(self):
+        scores_updated = False
         state, _ = self.nn_state()
         n_boxes = (state.sum(axis=2) == 4).sum()
         if n_boxes > sum(self.scores):
             self.scores[self.player_turn] += 1
+            scores_updated = True
+        return scores_updated
     
     def play(self, move): # returns True if move is legal, False otherwise
         y, x = (None, None)
@@ -207,19 +210,23 @@ class DnBBoard:
             root_y, root_x = (box_number//self.nb)*2+1, (box_number%self.nb)*2+1
             y = root_y+dy
             x = root_x+dx
-            self.board[y][x] = DnBStr.V_EDGE if side in 'lr' else DnBStr.H_EDGE
             ring, side, sub_ix = self.board2ring[(root_y+dy, root_x+dx)]
-            self.rings[ring][side, sub_ix] = True
         else: # numerical action index
             if (move < 0) or (move >= len(self.action_mapping)):
                 DnBBoard.illegal_move_warning()
                 return False
             ring, side, sub_ix = self.action_mapping[move]
-            self.rings[ring][side, sub_ix] = True
             y, x = self.ring2board[(ring, side, sub_ix)]
-            self.board[y][x] = DnBBoard.display_char(self.nb, side, True, ring_ix=ring)
-        self.update_scores()
-        self.player_turn = int(not self.player_turn) # change turn
+        if self.rings[ring][side, sub_ix]:
+            DnBBoard.illegal_move_warning()
+            return False
+        self.rings[ring][side, sub_ix] = True
+        self.board[y][x] = DnBBoard.display_char(self.nb, side, True, ring_ix=ring)
+        scores_updated = self.update_scores()
+        # by convention, we switch to the other player's turn when the game ends
+        # this is to interface properly with mcts in the general case
+        if (self.end_value() is not None) or (not scores_updated):
+            self.player_turn = int(not self.player_turn) # change turn
         return True
     
     def legal_action_mask(self):

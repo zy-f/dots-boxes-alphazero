@@ -4,6 +4,13 @@ from collections import defaultdict
 import numpy as np
 
 EPS = 1e-8
+DEFAULT_PARAMS = edict(
+    n_sim=100,
+    c_puct=1,
+    noise=.03,
+    noise_frac=0.25,
+    tau_pi=1
+)
 
 '''
 implements the Monte-Carlo Tree Search step of the algorithm
@@ -30,17 +37,24 @@ class MCSearchTree(object):
 
     def rollout_to_leaf(self, board=None):
         '''
-        recursively performs rollout to leaf; returns -z (z = board value)
-        (negated since value is flipped for the other player)
-        use board=None to indicate that we are at the root node
+        recursively performs rollout to leaf; returns the value of the board
+        for the CURRENT player, as well as who the CURRENT player is.
+        if the turn swaps during backpropagation, the CALLING layer should
+        flip/negate the value of the board, i.e. z
+        board=None indicates that we are at the root node, which is used
+        to add Dirichlet noise to the root exploration
         '''
         is_root = board is None
         if is_root:
             board = self.root_board.clone()
+        cur_turn = board.player_turn
         ## stop cases
         if z := board.end_value() is not None: # stop case 1: game ends
-            # z is player-1 based, should only return negative if the previous player is 1
-            return z if board.player_turn else -z
+            # z is player-1 based, so we should flip z if 
+            # the value of the current board for player 2 is always -z
+            # if 
+            # 
+            return (-z if cur_turn else z), cur_turn
         ts = board.tree_state()
         # stop case 2: leaf node reached
         if ts not in self.Ns:
@@ -56,8 +70,8 @@ class MCSearchTree(object):
             p /= p.sum() # renormalize
             self.state_policies[ts] = (p, legal_mask)
             # leaf found, backup the rollout
-            # return negative always since nn returns score for current player
-            return -z
+            # nn_z is always based on the current player
+            return nn_z, cur_turn
         ## if not in a stop case, need to pick an action!
         self.Ns[ts] += 1 # doing this cuz it makes more sense to me but not sure it's right
         p, legal_mask = self.state_policies[ts]
@@ -70,12 +84,14 @@ class MCSearchTree(object):
         was_legal = board.play(a_max)
         if not was_legal:
             raise ValueError('!? move selected was illegal')
-        z = self.rollout_to_leaf(board=board)
+        z, future_turn = self.rollout_to_leaf(board=board)
+        if future_turn != cur_turn:
+            z *= -1
         s_a = (ts, a_max)
         # iterative Qsa and Nsa updates, reduces to Q=z and N=1 in the new case
         self.Qsa[s_a] = (self.Nsa[s_a] * self.Qsa[s_a] + z) / (self.Nsa[s_a] + 1)
         self.Nsa[s_a] += 1
-        return -z # continue the backup process
+        return z, cur_turn # continue the backup process
 
     def root_counts(self):
         s = self.root_board.tree_state()
@@ -84,13 +100,7 @@ class MCSearchTree(object):
 
 class MCTS(object):
     
-    def __init__(self, verbose=False, params=edict(
-        n_sim=100,
-        c_puct=1,
-        noise=.03,
-        noise_frac=0.25,
-        tau_pi=1
-    )):
+    def __init__(self, verbose=False, params=None):
         '''
         search parameters:
             - n_sim = number of rollouts to perform before selecting the next move
@@ -99,7 +109,8 @@ class MCTS(object):
             - noise_frac = weight of noise vs true probabilitie for the root 
             - tau_pi = standard temperature param for softening probabilities in pi
         '''
-        self.params = params
+        self.params = DEFAULT_PARAMS
+        self.params.update(params)
         self.verbose = verbose
     
     def search(self, board, net, tau=None):
