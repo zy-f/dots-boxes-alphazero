@@ -192,6 +192,9 @@ class DnBBoard:
             self.scores[self.player_turn] += 1
     
     def play(self, move): # returns True if move is legal, False otherwise
+
+        # TODO: does not currently handle moves on occupied sides yet
+
         y, x = (None, None)
         if isinstance(move, tuple) or isinstance(move, list): # user-friendly input
             if len(move) != 2:
@@ -253,7 +256,9 @@ def debug():
     #     print(DnBBoard.str_repr_board(DnBBoard.board_from_rings(sym)))
     #     print('\n')
     while 1:
-        print(board.tree_board_state())
+        print(board.tree_state())
+        print(board.nn_state())
+        print(board.action_mapping)
         inp = input(f"player {board.player_turn+1}: ").strip()
         if inp.lower() == 'q':
             break
