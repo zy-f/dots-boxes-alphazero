@@ -70,6 +70,7 @@ class Storage(object):
 
         # TODO: do we only get one value per game?
         # TODO: would the inputs be tensors or arrays?
+        # TODO: don't we also need the predicted action probabilities and the predicted value?
 
         self.buffer["states"].extend(states)
         self.buffer["policies"].extend(policies)

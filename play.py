@@ -5,6 +5,9 @@ basically the inference-time file that lets you play vs the bot user
 from dots_boxes.nnet import DnBNet
 from dots_boxes.game_logic import DnBBoard
 
+# TODO: we can implement this after we make sure training works, 
+# because it would be much easier then.
+
 def request_user_move():
     legal_move = False
     while not legal_move:
