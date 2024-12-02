@@ -4,6 +4,13 @@ takes in all necessary components and defines the overall alphazero training loo
 '''
 
 from easydict import EasyDict as edict
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+from dots_boxes.game_logic import *
+from dots_boxes.nnet import *
+
 
 class AZLoss(nn.Module):
     def __init__(self, wd):
@@ -30,7 +37,8 @@ class Trainer(object):
         '''
         Use (nested) easydict for hyperparameters!
         hparams can include:
-        - num epochs per training round
+        - num iterations per training round
+        - number of epochs
         - optimizer hparams
         - convergence threshold
         - dataloader config
