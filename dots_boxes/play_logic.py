@@ -54,7 +54,7 @@ def makesize(size):
 
 
 class DnBGame:
-    def __init__(self, player_opts=PLAYER_TYPES):
+    def __init__(self, config, player_opts=PLAYER_TYPES):
         print("Let's play dots and boxes!")
         print("Player options: " + ', '.join([f'"{p}"' for p in player_opts]))
         p1 = p2 = None
@@ -70,7 +70,14 @@ class DnBGame:
         while board_size < 1:
             board_size = makesize(input("Board size [2-7]: "))
         self.board = DnBBoard(num_boxes=board_size)
-        self.players = [player_opts[p1](), player_opts[p2]()]
+        
+        if p1 == "alphazero":
+            self.players = [player_opts[p1](config), player_opts[p2]()]
+        elif p2 == "alphazero":
+            self.players = [player_opts[p1](), player_opts[p2](config)]
+        else:
+            self.players = [player_opts[p1](), player_opts[p2]()]
+            
         print('--- Instructions ---')
         print("Move format: <box label> [space] <side ([t]op/[b]ottom/[l]eft/[r]ight)>")
         print("For example, `a b` would select the bottom edge of box a")
