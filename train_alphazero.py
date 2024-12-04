@@ -3,11 +3,14 @@ main alphazero training file
 takes in all necessary components and defines the overall alphazero training loop
 '''
 
+import sys
+import yaml
 from easydict import EasyDict as edict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from tqdm import tqdm, trange
 import numpy as np
 from dots_boxes.game_logic import *
 from dots_boxes.nnet import *
@@ -16,7 +19,7 @@ from mcts import *
 
 
 class AZLoss(nn.Module):
-    def __init__(self, wd):
+    def __init__(self):
         super(AZLoss, self).__init__()
 
     """
@@ -32,7 +35,6 @@ class AZLoss(nn.Module):
         v_err = (z - v)**2 # mean squared error
         p_err = torch.sum(pi*p, dim=-1)
         loss = (v_err.view(-1) - p_err).mean()
-        # missing the weight regularization, maybe not needed for t3
         return loss
 
 class Trainer(object):
@@ -71,7 +73,8 @@ class Trainer(object):
         )
 
         net.train()
-        for epoch in range(self.hparams.epochs):
+        pbar = trange(self.hparams.epochs)
+        for epoch in pbar:
 
             # TODO: haven't handled any convergence criterion yet
 
@@ -89,7 +92,7 @@ class Trainer(object):
                 optimizer.step()
 
                 epoch_loss += loss.item()
-            print(f"Epoch {epoch + 1}/{self.hparams.epochs}, Loss: {epoch_loss:.4f}")
+            pbar.set_description(f"Epoch {epoch + 1}/{self.hparams.epochs}, Loss: {epoch_loss:.4f}")
         
         return net
 
@@ -101,13 +104,13 @@ class AlphaZero(object):
         Use easydict to create hyperparameter config! (JSON-style dict)
         '''
         self.config = config
-        self.config = config
-        self.storage = Storage(config.buffer_size)
+        self.storage = Storage(config.storage_config)
         self.board = DnBBoard(num_boxes=config.num_boxes)
         self.current_net = DnBNet(self.board.nb, len(self.board.action_mapping))
         self.storage.save_network(self.current_net)
         self.trainer = Trainer(config.trainer_hparams)
-        self.mcts = MCTS()
+        self.mcts = MCTS(config.mcts_config)
+        self.rng = np.random.default_rng(seed=config.seed)
 
     def run_training(self):
         '''
@@ -115,11 +118,11 @@ class AlphaZero(object):
         i believe in you lol
         you can follow from https://arxiv.org/pdf/1903.08129 page 5
         '''
-        for iteration in range(self.config.num_iterations):
-            print(f"=== Iteration {iteration + 1}/{self.config.num_iterations} ===")
+        for iteration in range(self.config.alphazero_iterations):
+            print(f"=== Iteration {iteration + 1}/{self.config.alphazero_iterations} ===")
 
             # 1. self-play
-            for _ in range(self.config.num_self_play_games):
+            for _ in trange(self.config.self_play_games_per_iter):
                 self.self_play_game(self.current_net)
 
             # 2. train
@@ -147,22 +150,22 @@ class AlphaZero(object):
         states1, policies1, values1 = [], [], []
         states2, policies2, values2 = [], [], []
 
-        while not board.end_value() is None:
+        while board.end_value() is None:
             net = p1 if board.player_turn == 0 else p2
             pi = self.mcts.search(board, net)
 
             if eval:
-                move = torch.argmax(pi).item()  # play greedily
+                move = np.argmax(pi)  # play greedily
             else:
-                move = torch.multinomial(pi, 1).item()  # sample a move
+                move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
 
             if not eval:
                 if board.player_turn == 0: 
-                    states1.append(board.nn_state())
-                    policies1.append(pi.cpu().numpy())
+                    states1.append(board.nn_state()[0])
+                    policies1.append(pi)
                 else:
-                    states2.append(board.nn_state())
-                    policies2.append(pi.cpu().numpy())
+                    states2.append(board.nn_state()[0])
+                    policies2.append(pi)
 
             board.play(move)
 
@@ -183,9 +186,9 @@ class AlphaZero(object):
         '''
         current_best = self.storage.best_network()
         new_model_wins = 0
-        total_games = self.config.num_comparison_games
+        total_games = self.config.comparison_games_per_iter
 
-        for game in range(total_games):
+        for game in trange(total_games):
             # alternate which model plays as p1
             if game % 2 == 0:
                 winner = self.self_play_game(new_model, current_best, eval=True)
@@ -197,16 +200,20 @@ class AlphaZero(object):
                     new_model_wins += 1
 
         win_rate = new_model_wins / total_games
+        print('New model winrate: ', win_rate)
         return win_rate >= 0.5 # if wins more than 50% of time?
 
-def main():
+def main(config_path):
     '''
     Main function! Train the alphazero instance, save the best model, all that good stuff.
     '''
     # TODO: some way to load the config
-    config = None
+    with open(config_path, 'r') as f:
+        config = edict(yaml.safe_load(f))
     alpha_zero = AlphaZero(config)
     alpha_zero.run_training()
 
 if __name__ == '__main__':
-    main()
+    assert len(sys.argv) > 1
+    config_path = sys.argv[1]
+    main(config_path)

@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from game_logic import *
+from dots_boxes.game_logic import *
 
 class DnBNet(nn.Module):
     '''
@@ -62,13 +62,13 @@ class DnBNet(nn.Module):
 
         # policy
         p = F.relu(self.policy_bn(self.policy_conv(x)))
-        p = p.view(batch_size, -1)
-        p = F.softmax(self.policy_fc(p), dim=1)
+        p = p.contiguous().view(batch_size, -1)
+        p = F.log_softmax(self.policy_fc(p), dim=1)
 
         # value
         v = F.relu(self.value_bn(self.value_conv(x)))
-        v = v.view(batch_size, -1)
-        z = torch.tanh(self.value_fc(v))
+        v = v.contiguous().view(batch_size, -1)
+        z = torch.tanh(self.value_fc(v)).squeeze()
 
         return p, z
 
@@ -89,6 +89,7 @@ class DnBNet(nn.Module):
         self.eval()
         with torch.no_grad():
             p, z = self.forward(board_tensor)
+            p = torch.exp(p)
         
         return p.squeeze(0).numpy(), z.item()
 

@@ -52,8 +52,6 @@ class MCSearchTree(object):
         if z := board.end_value() is not None: # stop case 1: game ends
             # z is player-1 based, so we should flip z if 
             # the value of the current board for player 2 is always -z
-            # if 
-            # 
             return (-z if cur_turn else z), cur_turn
         ts = board.tree_state()
         # stop case 2: leaf node reached
@@ -76,13 +74,20 @@ class MCSearchTree(object):
         self.Ns[ts] += 1 # doing this cuz it makes more sense to me but not sure it's right
         p, legal_mask = self.state_policies[ts]
         U = np.array([
-            self.Qsa[(ts, a)] + self.params.c_puct * p[a] * np.sqrt(self.Ns[ts]) \
-                / (1 + self.Nsa[(ts, a)])
-            for a in np.where(legal_mask)[0] # iterate thru legal actions
+            (self.Qsa[(ts, a)] + self.params.c_puct * p[a] * np.sqrt(self.Ns[ts]) \
+                / (1 + self.Nsa[(ts, a)]))
+            if legal_mask[a] else -float('inf')
+            for a in range(self.n_actions) # iterate thru legal actions
         ])
         a_max = np.argmax(U)
         was_legal = board.play(a_max)
         if not was_legal:
+            print(board)
+            print(a_max)
+            print("U", U)
+            print("p", p)
+            print("legal_mask", legal_mask)
+            breakpoint()
             raise ValueError('!? move selected was illegal')
         z, future_turn = self.rollout_to_leaf(board=board)
         if future_turn != cur_turn:
@@ -95,7 +100,7 @@ class MCSearchTree(object):
 
     def root_counts(self):
         s = self.root_board.tree_state()
-        return np.array([self.Nsa[(s,a)] for a in range(len(self.n_actions))])
+        return np.array([self.Nsa[(s,a)] for a in range(self.n_actions)])
 
 
 class MCTS(object):

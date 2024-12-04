@@ -5,14 +5,15 @@ as well as comparing versions of the model to each other to determine which to k
 
 from torch.utils.data import Dataset
 import torch
+import numpy as np
 import os
 
 class StorageDataset(Dataset):
     def __init__(self, states, policies, values):
         super(StorageDataset, self).__init__()
-        self.states = states
-        self.policies = policies
-        self.values = values
+        self.states = torch.from_numpy(states)
+        self.policies = torch.from_numpy(policies)
+        self.values = torch.from_numpy(values)
 
     def __len__(self):
         return len(self.states)
@@ -25,16 +26,19 @@ class StorageDataset(Dataset):
         }
     
 class Storage(object):
-    def __init__(self, buffer_size=-1):
+    def __init__(self, config):
         '''
         Initialize the storage object with relevant stuff idk
         Needs to track the running buffer of data and the current best network
+        config inputs:
+        - buffer_size: max number of data points to store
+        - ckpt_dir: directory to save networks to
+        - exp_name: experiment name (sets the save filename for the network)
         '''
-        self.buffer_size = buffer_size # this is the maximum number of data points to store?
+        self.cfg = config
         self.buffer = {"states": [], "policies": [], "values": []}
         self.best_net = None
-        self.ckpt_dir = "./ckpt"
-        os.makedirs(self.ckpt_dir, exist_ok=True)
+        os.makedirs(self.cfg.ckpt_dir, exist_ok=True)
 
     def best_network(self):
         '''
@@ -47,7 +51,7 @@ class Storage(object):
         saves a new network as the best network going forward
         '''
         self.best_net = net
-        ckpt_path = os.path.join(self.ckpt_dir, "best_network.pth")
+        ckpt_path = f"{self.cfg.ckpt_dir}/{self.cfg.exp_name}.pth"
         torch.save(net.state_dict(), ckpt_path)
         print(f"Best network saved to {ckpt_path}")
     
@@ -56,9 +60,9 @@ class Storage(object):
         returns a torch Dataset of the current data buffer with policy and value labels
         '''
 
-        states = torch.stack(self.buffer["states"])
-        policies = torch.stack(self.buffer["policies"])
-        values = torch.stack(self.buffer["values"])
+        states = np.stack(self.buffer["states"])
+        policies = np.stack(self.buffer["policies"])
+        values = np.stack(self.buffer["values"])
 
         return StorageDataset(states, policies, values)
     
@@ -76,10 +80,10 @@ class Storage(object):
         self.buffer["policies"].extend(policies)
         self.buffer["values"].extend(values)
 
-        if self.buffer_size > 0:
+        if self.cfg.buffer_size > 0:
             current_size = len(self.buffer["states"])
-            if current_size > self.buffer_size:
-                overflow = current_size - self.buffer_size
+            if current_size > self.cfg.buffer_size:
+                overflow = current_size - self.cfg.buffer_size
                 self.buffer["states"] = self.buffer["states"][overflow:]
                 self.buffer["policies"] = self.buffer["policies"][overflow:]
                 self.buffer["values"] = self.buffer["values"][overflow:]

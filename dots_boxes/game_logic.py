@@ -190,7 +190,7 @@ class DnBBoard:
         state, _ = self.nn_state()
         n_boxes = (state.sum(axis=2) == 4).sum()
         if n_boxes > sum(self.scores):
-            self.scores[self.player_turn] += 1
+            self.scores[self.player_turn] += n_boxes - sum(self.scores)
             scores_updated = True
         return scores_updated
     
