@@ -152,11 +152,11 @@ class AlphaZero(object):
         states1, policies1, values1 = [], [], []
         states2, policies2, values2 = [], [], []
 
+        n_moves = 0
         while board.end_value() is None:
             net = p1 if board.player_turn == 0 else p2
             pi = self.mcts.search(board, net)
-
-            if eval:
+            if eval or n_moves > self.optimal_move_cutoff:
                 move = np.argmax(pi)  # play greedily
             else:
                 move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
@@ -170,6 +170,7 @@ class AlphaZero(object):
                     policies2.append(pi)
 
             board.play(move)
+            n_moves += 1
 
         winner = board.end_value()  # +1 for player 1, -1 for player 2, 0 for draw
 
@@ -244,7 +245,7 @@ class AlphaZero(object):
         print('New model winrate: ', win_rate)
 
         # TODO: maybe this should be higher??
-        return win_rate > 0.5 # if wins more than 50% of time?
+        return win_rate > self.config.comparison_update_thresh
 
 def main(config_path):
     '''
