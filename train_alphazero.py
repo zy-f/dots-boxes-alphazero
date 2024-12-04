@@ -81,6 +81,7 @@ class Trainer(object):
             # TODO: haven't handled any convergence criterion yet
 
             epoch_loss = 0.0
+            batch_count = 0
             for batch in dataloader:
                 states = batch["state"]
                 pi = batch["policy"]
@@ -94,7 +95,8 @@ class Trainer(object):
                 optimizer.step()
 
                 epoch_loss += loss.item()
-            pbar.set_description(f"Epoch {epoch + 1}/{self.hparams.epochs}, Loss: {epoch_loss:.4f}")
+                batch_count += 1
+            pbar.set_description(f"Epoch {epoch + 1}/{self.hparams.epochs}, Loss: {epoch_loss / batch_count:.4f}")
         
         return net
 
