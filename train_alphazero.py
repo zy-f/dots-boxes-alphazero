@@ -156,7 +156,7 @@ class AlphaZero(object):
         while board.end_value() is None:
             net = p1 if board.player_turn == 0 else p2
             pi = self.mcts.search(board, net)
-            if eval or n_moves > self.optimal_move_cutoff:
+            if eval or n_moves > self.config.optimal_move_cutoff:
                 move = np.argmax(pi)  # play greedily
             else:
                 move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
