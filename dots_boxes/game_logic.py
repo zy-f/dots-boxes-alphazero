@@ -147,7 +147,7 @@ class DnBBoard:
                 self.rings.append(np.array(flat_rings[:4*(i+1)]).reshape(4,i+1))
                 flat_rings = flat_rings[4*(i+1):]
             self.board = DnBBoard.board_from_rings(self.rings)
-            self.scores = list(scores)
+            self.scores = list(scores[::-1] if self.player_turn else scores)
         else:
             self.nb = num_boxes
             self.nchar = 2 * self.nb + 1
@@ -168,7 +168,8 @@ class DnBBoard:
     
     def tree_state(self):
         flattened_rings = np.concatenate([r.flatten() for r in self.rings]).astype(int)
-        return ''.join([str(x) for x in flattened_rings]), tuple(self.scores)
+        score_state = tuple(self.scores[::-1] if self.player_turn else self.scores)
+        return ''.join([str(x) for x in flattened_rings]), score_state
     
     def nn_state(self):
         board_state = []
@@ -183,7 +184,8 @@ class DnBBoard:
                     self.board[root_y][root_x-1] != DnBStr.BLANK, # left edge
                 ])
             board_state.append(row)
-        return np.array(board_state, dtype=np.float32), tuple(self.scores)
+        score_state = tuple(self.scores[::-1] if self.player_turn else self.scores)
+        return np.array(board_state, dtype=np.float32), score_state
     
     def update_scores(self):
         scores_updated = False

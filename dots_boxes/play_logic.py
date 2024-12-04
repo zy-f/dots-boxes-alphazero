@@ -18,8 +18,8 @@ class Human(Player):
         return inp.split()
 PLAYER_TYPES['human'] = Human
 
-class BaselineBot(Player):
-    label = "Baseline (bot)"
+class GreedyBaselineBot(Player):
+    label = "Greedy (bot)"
     def move(self, board):
         legal_moves = np.where(board.legal_action_mask())[0]
         scoring_moves = []
@@ -41,7 +41,14 @@ class BaselineBot(Player):
         else:
             move = np.random.choice(legal_moves)
         return move
-PLAYER_TYPES['baseline'] = BaselineBot
+PLAYER_TYPES['greedy'] = GreedyBaselineBot
+
+class RandomBaselineBot(Player):
+    label = "Random (bot)"
+    def move(self, board):
+        legal_moves = np.where(board.legal_action_mask())[0]
+        return np.random.choice(legal_moves)
+PLAYER_TYPES['random'] = RandomBaselineBot
 
 def makesize(size):
     try:

@@ -8,22 +8,33 @@ import torch
 import numpy as np
 import os
 
-class StorageDataset(Dataset):
+class DnBStorageDataset(Dataset):
+    def collate_fn(items):
+        states, policies, values = zip(*items)
+        boards, scores = zip(*states)
+        return (
+            (torch.stack(boards), torch.stack(scores)),
+            torch.stack(policies),
+            torch.tensor(values)
+        )
+    
     def __init__(self, states, policies, values):
-        super(StorageDataset, self).__init__()
-        self.states = torch.from_numpy(states)
-        self.policies = torch.from_numpy(policies)
-        self.values = torch.from_numpy(values)
+        super(DnBStorageDataset, self).__init__()
+        boards, scores = zip(*states)
+        self.board_states = torch.from_numpy(np.stack(boards))
+        self.score_states = torch.tensor(scores, dtype=torch.float32)
+        self.policies = torch.from_numpy(np.stack(policies))
+        self.values = torch.from_numpy(np.stack(values))
 
     def __len__(self):
-        return len(self.states)
+        return len(self.values)
 
     def __getitem__(self, idx):
-        return {
-            "state": self.states[idx],
-            "policy": self.policies[idx],
-            "value": self.values[idx],
-        }
+        return (
+            (self.board_states[idx], self.score_states[idx]),
+            self.policies[idx],
+            self.values[idx],
+        )
     
 class Storage(object):
     def __init__(self, config):
@@ -60,11 +71,11 @@ class Storage(object):
         returns a torch Dataset of the current data buffer with policy and value labels
         '''
 
-        states = np.stack(self.buffer["states"])
-        policies = np.stack(self.buffer["policies"])
-        values = np.stack(self.buffer["values"])
+        states = self.buffer["states"]
+        policies = self.buffer["policies"]
+        values = self.buffer["values"]
 
-        return StorageDataset(states, policies, values)
+        return DnBStorageDataset(states, policies, values)
     
     def add_data(self, states, policies, values):
         '''

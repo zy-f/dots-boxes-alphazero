@@ -41,19 +41,22 @@ class DnBNet(nn.Module):
 
         self.value_conv = nn.Conv2d(num_filters, 4, kernel_size=1)
         self.value_bn = nn.BatchNorm2d(4)
-        self.value_fc = nn.Linear(4 * board_size * board_size, 1)
+        self.value_fc = nn.Linear(4 * board_size * board_size + 2, 1)
 
-    def forward(self, x):
+    def forward(self, state):
         """
         Parameters:
+        state is a tuple of:
         - x: torch.Tensor, batch of board states with shape (batch_size, board_size, board_size, 4).
+        - s: torch.Tensor, batch of scores (i.e. [my score, their score]) with shape (batch_size, 2).
 
         Returns:
         - p: torch.Tensor, policy vector of shape (batch_size, action_space).
         - z: torch.Tensor, scalar state evaluation of shape (batch_size, 1).
         """
+        x, s = state
         batch_size = x.size(0)
-        x = x.permute(0, 3, 1, 2) 
+        x = x.permute(0, 3, 1, 2)
 
         x = F.relu(self.bn1(self.conv1(x)))
 
@@ -68,6 +71,7 @@ class DnBNet(nn.Module):
         # value
         v = F.relu(self.value_bn(self.value_conv(x)))
         v = v.contiguous().view(batch_size, -1)
+        v = torch.cat((v, s), dim=1)
         z = torch.tanh(self.value_fc(v)).squeeze()
 
         return p, z
@@ -86,12 +90,13 @@ class DnBNet(nn.Module):
 
         board, score = board_state
         board_tensor = torch.tensor(board, dtype=torch.float32).unsqueeze(0)
+        score_tensor = torch.tensor(score, dtype=torch.float32).unsqueeze(0)
         self.eval()
         with torch.no_grad():
-            p, z = self.forward(board_tensor)
+            p, z = self.forward((board_tensor, score_tensor))
             p = torch.exp(p)
         
-        return p.squeeze(0).numpy(), z.item()
+        return p.squeeze(0).cpu().numpy(), z.item()
 
 
 class ResidualBlock(nn.Module):

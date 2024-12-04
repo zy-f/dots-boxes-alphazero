@@ -3,8 +3,8 @@ num_boxes: 3
 # device: mps # not yet implemented
 trainer_hparams:
   batch_size: 1024
-  epochs: 50
-  lr: 3.0e-3
+  epochs: 100
+  lr: 3.0e-4
   weight_decay: 0
   num_workers: 0
 alphazero_iterations: 100
@@ -21,4 +21,4 @@ mcts_config:
 storage_config:
   buffer_size: 2_000
   ckpt_dir: ./___ckpt
-  exp_name: hparam_sweep_informed
+  exp_name: score_net_hparam_sweep_informed

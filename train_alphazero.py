@@ -5,6 +5,7 @@ takes in all necessary components and defines the overall alphazero training loo
 
 import sys
 import yaml
+import traceback
 import time
 from easydict import EasyDict as edict
 import torch
@@ -63,6 +64,8 @@ class Trainer(object):
 
         dataloader = DataLoader(
             dataset,
+            collate_fn = type(dataset).collate_fn \
+                if hasattr(dataset, 'collate_fn') else None,
             batch_size=self.hparams.batch_size,
             shuffle=True,
             num_workers=self.hparams.get("num_workers", 4),
@@ -81,11 +84,7 @@ class Trainer(object):
             # TODO: haven't handled any convergence criterion yet
 
             epoch_loss = 0.0
-            for batch in dataloader:
-                states = batch["state"]
-                pi = batch["policy"]
-                z = batch["value"]
-
+            for (states, pi, z) in dataloader:
                 p, v = net(states)
 
                 loss = self.loss_fn(pi, p, z, v)
@@ -96,7 +95,7 @@ class Trainer(object):
                 epoch_loss += loss.item()
             pbar.set_description(f"Epoch {epoch + 1}/{self.hparams.epochs}, Loss: {epoch_loss:.4f}")
         
-        return net
+        return net.cpu()
 
 
 class AlphaZero(object):
@@ -163,10 +162,10 @@ class AlphaZero(object):
 
             if not eval:
                 if board.player_turn == 0: 
-                    states1.append(board.nn_state()[0])
+                    states1.append(board.nn_state())
                     policies1.append(pi)
                 else:
-                    states2.append(board.nn_state()[0])
+                    states2.append(board.nn_state())
                     policies2.append(pi)
 
             board.play(move)
@@ -206,6 +205,7 @@ class AlphaZero(object):
                     results[index] = winner
                 except Exception as e:
                     print(f"Error during self-play: {e}")
+                    print(traceback.print_exc())
         return results
 
     def compare_models(self, new_model):
