@@ -5,6 +5,7 @@ takes in all necessary components and defines the overall alphazero training loo
 
 import sys
 import yaml
+import time
 from easydict import EasyDict as edict
 import torch
 import torch.nn as nn
@@ -16,6 +17,7 @@ from dots_boxes.game_logic import *
 from dots_boxes.nnet import *
 from data_store import *
 from mcts import *
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 class AZLoss(nn.Module):
@@ -97,7 +99,6 @@ class Trainer(object):
         return net
 
 
-
 class AlphaZero(object):
     def __init__(self, config):
         '''
@@ -122,8 +123,9 @@ class AlphaZero(object):
             print(f"=== Iteration {iteration + 1}/{self.config.alphazero_iterations} ===")
 
             # 1. self-play
-            for _ in trange(self.config.self_play_games_per_iter):
-                self.self_play_game(self.current_net)
+            start_time = time.time()
+            self.parallel_self_play(self.config.self_play_games_per_iter, self.current_net)
+            print(f"Training self play takes {time.time() - start_time:.3f} seconds.")
 
             # 2. train
             dataset = self.storage.get_dataset()
@@ -173,11 +175,36 @@ class AlphaZero(object):
 
         if not eval:
             values1 = [winner for _ in states1]
-            self.storage.add_data(states1, policies1, values1)
+            # self.storage.add_data(states1, policies1, values1)
             values2 = [-winner for _ in states2]
-            self.storage.add_data(states2, policies2, values2)
+            # self.storage.add_data(states2, policies2, values2)
+            return winner, states1, policies1, values1, states2, policies2, values2
+        else:
+            return winner
 
-        return winner
+    def parallel_self_play(self, num_games, p1, p2=None, eval=False):
+        num_workers = min(8, num_games)
+        if not eval:
+            tasks = [(p1, p2, eval) for _ in range(num_games)]
+        else:
+            # switch position
+            tasks = [(p1, p2, eval) if i%2 == 0 else (p2, p1, eval) for i in range(num_games)]
+        results = []
+
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = [executor.submit(self.self_play_game, *task) for task in tasks]
+            for future in tqdm(as_completed(futures), total=num_games, desc="Self-Play Games"):
+                try:
+                    if not eval:
+                        winner, states1, policies1, values1, states2, policies2, values2 = future.result()
+                        self.storage.add_data(states1, policies1, values1)
+                        self.storage.add_data(states2, policies2, values2)
+                    else:
+                        winner = future.result()
+                    results.append(winner)
+                except Exception as e:
+                    print(f"Error during self-play: {e}")
+        return results
 
     def compare_models(self, new_model):
         '''
@@ -187,17 +214,28 @@ class AlphaZero(object):
         current_best = self.storage.best_network()
         new_model_wins = 0
         total_games = self.config.comparison_games_per_iter
+        
+        start_time = time.time()
+        winners = self.parallel_self_play(total_games, new_model, current_best, eval=True)
+        print(f"Comparison self play takes {time.time() - start_time:.3f} seconds.")
 
-        for game in trange(total_games):
-            # alternate which model plays as p1
-            if game % 2 == 0:
-                winner = self.self_play_game(new_model, current_best, eval=True)
-                if winner == +1:
-                    new_model_wins += 1
-            else:
-                winner = self.self_play_game(current_best, new_model, eval=True)
-                if winner == -1:
-                    new_model_wins += 1
+        # for game in trange(total_games):
+        #     # alternate which model plays as p1
+        #     if game % 2 == 0:
+        #         winner = self.self_play_game(new_model, current_best, eval=True)
+        #         if winner == +1:
+        #             new_model_wins += 1
+        #     else:
+        #         winner = self.self_play_game(current_best, new_model, eval=True)
+        #         if winner == -1:
+        #             new_model_wins += 1
+
+        # TODO: what if tie?
+        for winner in winners:
+            if winner == +1:
+                new_model_wins += 1
+            if winner == -1:
+                new_model_wins += 1
 
         win_rate = new_model_wins / total_games
         print('New model winrate: ', win_rate)

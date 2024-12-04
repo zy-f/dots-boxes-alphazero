@@ -7,9 +7,9 @@ trainer_hparams:
   lr: 3.0e-4
   weight_decay: 0
   num_workers: 0
-alphazero_iterations: 20
-self_play_games_per_iter: 5
-comparison_games_per_iter: 7
+alphazero_iterations: 100
+self_play_games_per_iter: 8
+comparison_games_per_iter: 8
 mcts_config:
   n_sim: 25
   c_puct: 1
