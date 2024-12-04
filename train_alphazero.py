@@ -84,6 +84,7 @@ class Trainer(object):
             # TODO: haven't handled any convergence criterion yet
 
             epoch_loss = 0.0
+            batch_count = 0
             for (states, pi, z) in dataloader:
                 p, v = net(states)
 
