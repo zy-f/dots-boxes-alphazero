@@ -189,19 +189,20 @@ class AlphaZero(object):
         else:
             # switch position
             tasks = [(p1, p2, eval) if i%2 == 0 else (p2, p1, eval) for i in range(num_games)]
-        results = []
+        results = [None] * num_games
 
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = [executor.submit(self.self_play_game, *task) for task in tasks]
+            futures = {executor.submit(self.self_play_game, *task): i for i, task in enumerate(tasks)}
             for future in tqdm(as_completed(futures), total=num_games, desc="Self-Play Games"):
                 try:
+                    index = futures[future]
                     if not eval:
                         winner, states1, policies1, values1, states2, policies2, values2 = future.result()
                         self.storage.add_data(states1, policies1, values1)
                         self.storage.add_data(states2, policies2, values2)
                     else:
                         winner = future.result()
-                    results.append(winner)
+                    results[index] = winner
                 except Exception as e:
                     print(f"Error during self-play: {e}")
         return results
@@ -231,15 +232,19 @@ class AlphaZero(object):
         #             new_model_wins += 1
 
         # TODO: what if tie?
-        for winner in winners:
-            if winner == +1:
-                new_model_wins += 1
-            if winner == -1:
-                new_model_wins += 1
+        for i, winner in enumerate(winners):
+            if i % 2 == 0:
+                if winner == +1:
+                    new_model_wins += 1
+            else:
+                if winner == -1:
+                    new_model_wins += 1
 
         win_rate = new_model_wins / total_games
         print('New model winrate: ', win_rate)
-        return win_rate >= 0.5 # if wins more than 50% of time?
+
+        # TODO: maybe this should be higher??
+        return win_rate > 0.5 # if wins more than 50% of time?
 
 def main(config_path):
     '''

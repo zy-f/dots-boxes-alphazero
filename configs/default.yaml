@@ -3,12 +3,12 @@ num_boxes: 3
 # device: mps # not yet implemented
 trainer_hparams:
   batch_size: 1024
-  epochs: 50
+  epochs: 25
   lr: 3.0e-4
   weight_decay: 0
   num_workers: 0
-alphazero_iterations: 100
-self_play_games_per_iter: 8
+alphazero_iterations: 10  # for debug
+self_play_games_per_iter: 32   # suragnair/alpha-zero-general uses 100
 comparison_games_per_iter: 8
 mcts_config:
   n_sim: 25
