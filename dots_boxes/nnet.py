@@ -25,6 +25,8 @@ class DnBNet(nn.Module):
 
     def __init__(self, board_size, action_space, num_filters=64, num_res_blocks=3):
         super(DnBNet, self).__init__()
+
+        print(f"\nUsing {num_filters} filter size and {num_res_blocks} res blocks!.\n")
         self.board_size = board_size
         self.max_score = board_size * board_size  # used to normalize score to 0 to 1 
         self.action_space = action_space

@@ -10,15 +10,6 @@ import os
 import matplotlib.pyplot as plt
 
 class DnBStorageDataset(Dataset):
-    def collate_fn(items):
-        states, policies, values = zip(*items)
-        boards, scores = zip(*states)
-        return (
-            (torch.stack(boards), torch.stack(scores)),
-            torch.stack(policies),
-            torch.tensor(values)
-        )
-    
     def __init__(self, states, policies, values):
         super(DnBStorageDataset, self).__init__()
         boards, scores = zip(*states)
@@ -54,7 +45,7 @@ class Storage(object):
         os.makedirs(self.folder, exist_ok=True)
 
         # for saving winrate against baseline files
-        file_names = ["winrate_against_greedy.txt", "winrate_against_random.txt"]
+        file_names = ["winrate_against_greedy.txt", "winrate_against_random.txt", "train_loss.txt"]
         for file_name in file_names:
             file_path = os.path.join(self.folder, file_name)
             with open(file_path, 'w') as file:
@@ -63,6 +54,10 @@ class Storage(object):
     def update_winrate(self, winrate, baseline):
         with open(os.path.join(self.folder, f"winrate_against_{baseline}.txt"), 'a') as file:
             file.write(f"{winrate}\n")
+    
+    def update_train_loss(self, train_loss):
+        with open(os.path.join(self.folder, f"train_loss.txt"), 'a') as file:
+            file.write(f"{train_loss}\n")
     
     def plot_winrates(self):
         with open(os.path.join(self.folder, "winrate_against_greedy.txt"), 'r') as file:
@@ -82,6 +77,23 @@ class Storage(object):
         
         plt.legend()
         plt.savefig(os.path.join(self.folder, "winrate_plots.png"), dpi=300)
+        plt.close()
+    
+    def plot_train_loss(self):
+        with open(os.path.join(self.folder, "train_loss.txt"), 'r') as file:
+            train_loss = [float(line.strip()) for line in file.readlines()]
+        
+        iterations = range(1, len(train_loss) + 1)
+        plt.figure(figsize=(10, 6))
+        plt.plot(iterations, train_loss, label='Train loss', color='r', linewidth=2)
+        
+        plt.title('Training Loss Curve', fontsize=16)
+        plt.xlabel('Iterations', fontsize=14)
+        plt.ylabel('Training Loss', fontsize=14)
+        
+        plt.legend()
+        plt.savefig(os.path.join(self.folder, "train_loss.png"), dpi=300)
+        plt.close()
 
     def best_network(self):
         '''
