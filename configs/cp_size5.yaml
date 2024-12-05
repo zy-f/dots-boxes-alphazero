@@ -1,0 +1,24 @@
+seed: 85
+num_boxes: 5
+# device: mps # not yet implemented
+trainer_hparams:
+  batch_size: 1024
+  epochs: 50
+  lr: 3.0e-3
+  weight_decay: 1.0e-4
+  num_workers: 0
+alphazero_iterations: 100
+self_play_games_per_iter: 10
+optimal_move_cutoff: 48
+comparison_games_per_iter: 20
+comparison_update_thresh: 0.55
+mcts_config:
+  n_sim: 500
+  c_puct: 4
+  noise: 0.5
+  noise_frac: 0.25
+  tau_pi: 1
+storage_config:
+  buffer_size: 10_000
+  ckpt_dir: ./___ckpt
+  exp_name: size5_v1
