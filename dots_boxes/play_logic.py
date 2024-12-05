@@ -77,13 +77,11 @@ class DnBGame:
         while board_size < 1:
             board_size = makesize(input("Board size [2-7]: "))
         self.board = DnBBoard(num_boxes=board_size)
-        
-        if p1 == "alphazero":
-            self.players = [player_opts[p1](config), player_opts[p2]()]
-        elif p2 == "alphazero":
-            self.players = [player_opts[p1](), player_opts[p2](config)]
-        else:
-            self.players = [player_opts[p1](), player_opts[p2]()]
+        self.players = [
+            player_opts[p1](config) if p1 == "alphazero" else player_opts[p1](),
+            player_opts[p2](config) if p2 == "alphazero" else player_opts[p2](),
+
+        ]
             
         print('--- Instructions ---')
         print("Move format: <box label> [space] <side ([t]op/[b]ottom/[l]eft/[r]ight)>")
