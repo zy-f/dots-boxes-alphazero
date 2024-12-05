@@ -1,6 +1,6 @@
 seed: 85
 num_boxes: 2
-device: cpu  # not yet implemented
+device: cpu
 trainer_hparams:
   batch_size: 128  # trying something smaller
   epochs: 15

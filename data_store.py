@@ -70,7 +70,9 @@ class Storage(object):
         plt.figure(figsize=(10, 6))
         plt.plot(iterations, greedy_winrates, label='Win Rate Against Greedy', color='b', linewidth=2)
         plt.plot(iterations, random_winrates, label='Win Rate Against Random', color='g', linewidth=2)
-        
+        plt.axhline(y=0.5, color='gray', linestyle='--')
+
+        plt.ylim(0, 1)
         plt.title('Winrate Evaluation Curves', fontsize=16)
         plt.xlabel('Iterations', fontsize=14)
         plt.ylabel('Winrate', fontsize=14)
@@ -86,7 +88,7 @@ class Storage(object):
         iterations = range(1, len(train_loss) + 1)
         plt.figure(figsize=(10, 6))
         plt.plot(iterations, train_loss, label='Train loss', color='r', linewidth=2)
-        
+
         plt.title('Training Loss Curve', fontsize=16)
         plt.xlabel('Iterations', fontsize=14)
         plt.ylabel('Training Loss', fontsize=14)

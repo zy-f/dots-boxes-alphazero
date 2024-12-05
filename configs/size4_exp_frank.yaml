@@ -1,5 +1,5 @@
 seed: 85
-num_boxes: 5
+num_boxes: 4
 device: cuda
 trainer_hparams:
   batch_size: 128
@@ -9,19 +9,19 @@ trainer_hparams:
   num_workers: 0
 alphazero_iterations: 500
 self_play_games_per_iter: 64
-optimal_move_cutoff: 48  # 70 moves in total
+optimal_move_cutoff: 24  # 40 moves in total
 comparison_games_per_iter: 32
 comparison_update_thresh: 0.55
 mcts_config:
   n_sim: 200
   c_puct: 2.0
-  noise: 0.25
+  noise: 0.2
   noise_frac: 0.25
   tau_pi: 1
 storage_config:
-  buffer_size: 20_000  # ~70 * 64 * 5, retain last 5 iters
+  buffer_size: 13_000  # ~40 * 64 * 5, retain last 5 iters
   ckpt_dir: ./___ckpt
-  exp_name: size5_exp_frank
+  exp_name: size4_exp_frank
 model_config:
   num_filters: 64
-  num_res_blocks: 5
+  num_res_blocks: 4
