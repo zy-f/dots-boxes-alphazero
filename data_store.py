@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 class DnBStorageDataset(Dataset):
     def collate_fn(items):
@@ -49,7 +50,38 @@ class Storage(object):
         self.cfg = config
         self.buffer = {"states": [], "policies": [], "values": []}
         self.best_net = None
-        os.makedirs(self.cfg.ckpt_dir, exist_ok=True)
+        self.folder = f"{self.cfg.ckpt_dir}/{self.cfg.exp_name}"
+        os.makedirs(self.folder, exist_ok=True)
+
+        # for saving winrate against baseline files
+        file_names = ["winrate_against_greedy.txt", "winrate_against_random.txt"]
+        for file_name in file_names:
+            file_path = os.path.join(self.folder, file_name)
+            with open(file_path, 'w') as file:
+                pass
+    
+    def update_winrate(self, winrate, baseline):
+        with open(os.path.join(self.folder, f"winrate_against_{baseline}.txt"), 'a') as file:
+            file.write(f"{winrate}\n")
+    
+    def plot_winrates(self):
+        with open(os.path.join(self.folder, "winrate_against_greedy.txt"), 'r') as file:
+            greedy_winrates = [float(line.strip()) for line in file.readlines()]
+        
+        with open(os.path.join(self.folder, "winrate_against_random.txt"), 'r') as file:
+            random_winrates = [float(line.strip()) for line in file.readlines()]
+        
+        iterations = range(1, len(greedy_winrates) + 1)
+        plt.figure(figsize=(10, 6))
+        plt.plot(iterations, greedy_winrates, label='Win Rate Against Greedy', color='b', linewidth=2)
+        plt.plot(iterations, random_winrates, label='Win Rate Against Random', color='g', linewidth=2)
+        
+        plt.title('Winrate Evaluation Curves', fontsize=16)
+        plt.xlabel('Iterations', fontsize=14)
+        plt.ylabel('Winrate', fontsize=14)
+        
+        plt.legend()
+        plt.savefig(os.path.join(self.folder, "winrate_plots.png"), dpi=300)
 
     def best_network(self):
         '''
@@ -62,7 +94,7 @@ class Storage(object):
         saves a new network as the best network going forward
         '''
         self.best_net = net
-        ckpt_path = f"{self.cfg.ckpt_dir}/{self.cfg.exp_name}.pth"
+        ckpt_path = f"{self.folder}/{self.cfg.exp_name}.pth"
         torch.save(net.state_dict(), ckpt_path)
         print(f"Best network saved to {ckpt_path}")
     

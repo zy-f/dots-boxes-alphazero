@@ -19,7 +19,7 @@ from dots_boxes.nnet import *
 from data_store import *
 from mcts import *
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
+from dots_boxes.play_logic import *
 
 class AZLoss(nn.Module):
     def __init__(self):
@@ -114,6 +114,9 @@ class AlphaZero(object):
         self.mcts = MCTS(config.mcts_config)
         self.rng = np.random.default_rng(seed=config.seed)
 
+        self.greedy_player = GreedyBaselineBot()
+        self.random_player = RandomBaselineBot()
+
     def run_training(self):
         '''
         main training function
@@ -124,9 +127,9 @@ class AlphaZero(object):
             print(f"=== Iteration {iteration + 1}/{self.config.alphazero_iterations} ===")
 
             # 1. self-play
-            start_time = time.time()
+            # start_time = time.time()
             self.parallel_self_play(self.config.self_play_games_per_iter, self.current_net)
-            print(f"Training self play takes {time.time() - start_time:.3f} seconds.")
+            # print(f"Training self play takes {time.time() - start_time:.3f} seconds.")
 
             # 2. train
             dataset = self.storage.get_dataset()
@@ -136,9 +139,14 @@ class AlphaZero(object):
             if self.compare_models(trained_net):
                 self.storage.save_network(trained_net)
                 self.current_net = trained_net
-            else:
-                # TODO: do some early stopping stuff?
-                pass
+            
+            winrate_against_greedy = self.compare_models(trained_net, baseline = "greedy")
+            self.storage.update_winrate(winrate_against_greedy, baseline = "greedy")
+            winrate_against_random = self.compare_models(trained_net, baseline = "random")
+            self.storage.update_winrate(winrate_against_random, baseline = "random")
+            self.storage.plot_winrates()
+            
+            print()
 
     def self_play_game(self, p1, p2=None, eval=False):
         '''
@@ -156,19 +164,25 @@ class AlphaZero(object):
         n_moves = 0
         while board.end_value() is None:
             net = p1 if board.player_turn == 0 else p2
-            pi = self.mcts.search(board, net)
-            if eval or n_moves > self.config.optimal_move_cutoff:
-                move = np.argmax(pi)  # play greedily
-            else:
-                move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
 
-            if not eval:
-                if board.player_turn == 0: 
-                    states1.append(board.nn_state())
-                    policies1.append(pi)
+            if isinstance(net, nn.Module):
+                pi = self.mcts.search(board, net)
+                if eval or n_moves > self.config.optimal_move_cutoff:
+                    move = np.argmax(pi)  # play greedily
                 else:
-                    states2.append(board.nn_state())
-                    policies2.append(pi)
+                    move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
+
+                if not eval:
+                    if board.player_turn == 0: 
+                        states1.append(board.nn_state())
+                        policies1.append(pi)
+                    else:
+                        states2.append(board.nn_state())
+                        policies2.append(pi)
+            else:
+                # baselines
+                assert(eval)
+                move = net.move(board)
 
             board.play(move)
             n_moves += 1
@@ -210,32 +224,28 @@ class AlphaZero(object):
                     print(traceback.print_exc())
         return results
 
-    def compare_models(self, new_model):
+    def compare_models(self, new_model, baseline = None):
         '''
         compare 2 models and return the best one
         play k games between them and update to new_model if high enough winrate
         '''
-        current_best = self.storage.best_network()
+        if baseline is None:
+            current_best = self.storage.best_network()  # prev best model
+        elif baseline == "greedy":
+            current_best = self.greedy_player
+        elif baseline == "random":
+            current_best = self.random_player
+
         new_model_wins = 0
         total_games = self.config.comparison_games_per_iter
         
-        start_time = time.time()
+        # start_time = time.time()
         winners = self.parallel_self_play(total_games, new_model, current_best, eval=True)
-        print(f"Comparison self play takes {time.time() - start_time:.3f} seconds.")
+        # print(f"Comparison self play takes {time.time() - start_time:.3f} seconds.")
 
-        # for game in trange(total_games):
-        #     # alternate which model plays as p1
-        #     if game % 2 == 0:
-        #         winner = self.self_play_game(new_model, current_best, eval=True)
-        #         if winner == +1:
-        #             new_model_wins += 1
-        #     else:
-        #         winner = self.self_play_game(current_best, new_model, eval=True)
-        #         if winner == -1:
-        #             new_model_wins += 1
-
-        # TODO: what if tie?
         for i, winner in enumerate(winners):
+            if winner == 0:
+                new_model_wins += 0.5  # TODO: draw counts as 0.5?
             if i % 2 == 0:
                 if winner == +1:
                     new_model_wins += 1
@@ -244,9 +254,15 @@ class AlphaZero(object):
                     new_model_wins += 1
 
         win_rate = new_model_wins / total_games
-        print('New model winrate: ', win_rate)
+        if baseline is None:
+            print('New model winrate: ', f"{win_rate:.3f}")
+        elif baseline == "greedy":
+            print('New model against greedy winrate: ', f"{win_rate:.3f}")
+            return win_rate
+        elif baseline == "random":
+            print('New model against random winrate: ', f"{win_rate:.3f}")
+            return win_rate
 
-        # TODO: maybe this should be higher??
         return win_rate > self.config.comparison_update_thresh
 
 def main(config_path):

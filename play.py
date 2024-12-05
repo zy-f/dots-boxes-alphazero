@@ -29,7 +29,7 @@ class AlphaZero(Player):
         self.net = DnBNet(self.board.nb, len(self.board.action_mapping))
         self.mcts = MCTS(config.mcts_config)
 
-        self.pretrained_path = f"{self.config.storage_config.ckpt_dir}/{self.config.storage_config.exp_name}.pth"
+        self.pretrained_path = f"{self.config.storage_config.ckpt_dir}/{self.config.storage_config.exp_name}/{self.config.storage_config.exp_name}.pth"
         checkpoint = torch.load(self.pretrained_path, map_location=torch.device('cpu'))
         self.net.load_state_dict(checkpoint)
 
