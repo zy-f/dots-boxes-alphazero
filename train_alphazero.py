@@ -234,7 +234,7 @@ class AlphaZero(object):
             tasks = [(p1, p2, eval, i) for i in range(num_games)]
         else:
             # switch position
-            tasks = [(p1, p2, eval, i) if i%2 == 0 else (p2, p1, eval) for i in range(num_games)]
+            tasks = [(p1, p2, eval, i) if i%2 == 0 else (p2, p1, eval, i) for i in range(num_games)]
         results = [None] * num_games
 
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
