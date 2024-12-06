@@ -132,7 +132,7 @@ class AlphaZero(object):
         self.storage.save_network(self.current_net)
         self.trainer = Trainer(config.trainer_hparams, device=config.device)
         self.mcts = MCTS(config.mcts_config)
-        self.rng = np.random.default_rng(seed=config.seed)
+        # self.rng = np.random.default_rng(seed=config.seed)
 
         self.greedy_player = GreedyBaselineBot()
         self.random_player = RandomBaselineBot()
@@ -170,12 +170,14 @@ class AlphaZero(object):
 
             print()
 
-    def self_play_game(self, p1, p2=None, eval=False):
+    def self_play_game(self, p1, p2=None, eval=False, idx=0):
         '''
         simulates a game between 2 players (aka networks) p1 and p2
         eval=False -> tracks and updates storage with the relevant states/policies/final values
         eval=True -> play greedy moves to compare the two networks
         '''
+        # in parallel processing, we want each game to be different...
+        np.random.seed(self.config.seed + idx)
         if p2 is None:
             p2 = p1
         
@@ -198,8 +200,8 @@ class AlphaZero(object):
                 if eval or n_moves > self.config.optimal_move_cutoff:
                     move = np.argmax(pi)  # play greedily
                 else:
-                    move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
-
+                    # move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
+                    move = np.random.choice(np.arange(len(pi)), p=pi)
                 if not eval:
                     if board.player_turn == 0: 
                         states1.append(board.nn_state())
@@ -229,10 +231,10 @@ class AlphaZero(object):
     def parallel_self_play(self, num_games, p1, p2=None, eval=False):
         num_workers = min(os.cpu_count(), num_games)
         if not eval:
-            tasks = [(p1, p2, eval) for _ in range(num_games)]
+            tasks = [(p1, p2, eval, i) for i in range(num_games)]
         else:
             # switch position
-            tasks = [(p1, p2, eval) if i%2 == 0 else (p2, p1, eval) for i in range(num_games)]
+            tasks = [(p1, p2, eval, i) if i%2 == 0 else (p2, p1, eval) for i in range(num_games)]
         results = [None] * num_games
 
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
