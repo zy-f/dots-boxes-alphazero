@@ -229,7 +229,8 @@ class AlphaZero(object):
             return winner
 
     def parallel_self_play(self, num_games, p1, p2=None, eval=False):
-        num_workers = min(os.cpu_count(), num_games)
+        cpu_count = min(os.cpu_count(), 32) # hack for cluster
+        num_workers = min(cpu_count, num_games)
         if not eval:
             tasks = [(p1, p2, eval, i) for i in range(num_games)]
         else:
