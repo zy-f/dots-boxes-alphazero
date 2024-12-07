@@ -9,7 +9,7 @@ trainer_hparams:
   num_workers: 0
 alphazero_iterations: 500
 self_play_games_per_iter: 96
-optimal_move_cutoff: 12  # 24 moves in total
+optimal_move_cutoff: 15  # 24 moves in total
 comparison_games_per_iter: 32
 comparison_update_thresh: 0.55
 mcts_config:
