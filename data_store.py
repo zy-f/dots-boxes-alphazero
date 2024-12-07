@@ -72,16 +72,16 @@ class Storage(object):
             random_winrates = [float(line.strip()) for line in file.readlines()]
         
         iterations = range(1, len(greedy_winrates) + 1)
-        plt.figure(figsize=(10, 6))
-        plt.plot(iterations, greedy_winrates, label='Win Rate Against Greedy', color='b', linewidth=2)
-        plt.plot(iterations, random_winrates, label='Win Rate Against Random', color='g', linewidth=2)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(iterations, greedy_winrates, label='Win Rate Against Greedy', color='b', linewidth=2)
+        ax.plot(iterations, random_winrates, label='Win Rate Against Random', color='g', linewidth=2)
         
-        plt.title('Winrate Evaluation Curves', fontsize=16)
-        plt.xlabel('Iterations', fontsize=14)
-        plt.ylabel('Winrate', fontsize=14)
+        ax.set_title('Winrate Evaluation Curves', fontsize=16)
+        ax.set_xlabel('Iterations', fontsize=14)
+        ax.set_ylabel('Winrate', fontsize=14)
         
-        plt.legend()
-        plt.savefig(os.path.join(self.folder, "winrate_plots.png"), dpi=300)
+        ax.legend()
+        fig.savefig(os.path.join(self.folder, "winrate_plots.png"), dpi=300)
 
     def best_network(self):
         '''
