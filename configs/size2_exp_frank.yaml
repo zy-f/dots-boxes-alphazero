@@ -1,6 +1,6 @@
 seed: 85
 num_boxes: 2
-# device: mps  # not yet implemented
+device: cpu
 trainer_hparams:
   batch_size: 128  # trying something smaller
   epochs: 15
@@ -22,3 +22,6 @@ storage_config:
   buffer_size: 2_400 # 12 * 40 * 5, retain last 5 iters
   ckpt_dir: ./___ckpt
   exp_name: size2_exp_frank
+model_config:
+  num_filters: 64
+  num_res_blocks: 3

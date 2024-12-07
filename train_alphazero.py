@@ -7,6 +7,7 @@ import sys
 import yaml
 import traceback
 import time
+import os
 from easydict import EasyDict as edict
 import torch
 import torch.nn as nn
@@ -41,7 +42,7 @@ class AZLoss(nn.Module):
         return loss
 
 class Trainer(object):
-    def __init__(self, hparams):
+    def __init__(self, hparams, device="cpu"):
         '''
         Use (nested) easydict for hyperparameters!
         hparams can include:
@@ -54,7 +55,8 @@ class Trainer(object):
 
         # TODO: assumes hparams contains batch_size, num_workers, lr, weight_decay, epochs
         self.hparams = hparams
-        self.loss_fn = AZLoss()
+        self.device = device
+        self.loss_fn = AZLoss().to(self.device)
 
     def train_model(self, net, dataset):
         '''
@@ -62,13 +64,28 @@ class Trainer(object):
         Return the trained model
         '''
 
+        def to_device_collate_fn(device):
+            """
+            A custom collate function to move data to the specified device.
+            """
+            def collate_fn(items):
+                states, policies, values = zip(*items)
+                boards, scores = zip(*states)
+                return (
+                    (torch.stack(boards).to(device), torch.stack(scores).to(device)),
+                    torch.stack(policies).to(device),
+                    torch.stack(values).to(device),
+                )
+            return collate_fn
+
         dataloader = DataLoader(
             dataset,
-            collate_fn = type(dataset).collate_fn \
-                if hasattr(dataset, 'collate_fn') else None,
+            collate_fn = to_device_collate_fn(self.device),
+            # collate_fn = type(dataset).collate_fn \
+            #     if hasattr(dataset, 'collate_fn') else None,
             batch_size=self.hparams.batch_size,
             shuffle=True,
-            num_workers=self.hparams.get("num_workers", 4),
+            num_workers=self.hparams.get("num_workers", 8),
         )
 
         optimizer = torch.optim.Adam(
@@ -76,7 +93,8 @@ class Trainer(object):
             lr=self.hparams.lr,
             weight_decay=self.hparams.get("weight_decay", 0),
         )
-
+        
+        net = net.to(self.device)
         net.train()
         pbar = trange(self.hparams.epochs)
         for epoch in pbar:
@@ -97,7 +115,7 @@ class Trainer(object):
                 batch_count += 1
             pbar.set_description(f"Epoch {epoch + 1}/{self.hparams.epochs}, Loss: {epoch_loss / batch_count:.4f}")
         
-        return net.cpu()
+        return net.cpu(), epoch_loss / batch_count
 
 
 class AlphaZero(object):
@@ -108,11 +126,13 @@ class AlphaZero(object):
         self.config = config
         self.storage = Storage(config.storage_config)
         self.board = DnBBoard(num_boxes=config.num_boxes)
-        self.current_net = DnBNet(self.board.nb, len(self.board.action_mapping))
+        self.current_net = DnBNet(self.board.nb, len(self.board.action_mapping),
+                                  num_filters=config.model_config.num_filters, 
+                                  num_res_blocks=config.model_config.num_res_blocks)
         self.storage.save_network(self.current_net)
-        self.trainer = Trainer(config.trainer_hparams)
+        self.trainer = Trainer(config.trainer_hparams, device=config.device)
         self.mcts = MCTS(config.mcts_config)
-        self.rng = np.random.default_rng(seed=config.seed)
+        # self.rng = np.random.default_rng(seed=config.seed)
 
         self.greedy_player = GreedyBaselineBot()
         self.random_player = RandomBaselineBot()
@@ -133,7 +153,9 @@ class AlphaZero(object):
 
             # 2. train
             dataset = self.storage.get_dataset()
-            trained_net = self.trainer.train_model(self.current_net, dataset)
+            trained_net, train_loss = self.trainer.train_model(self.current_net, dataset)
+            self.storage.update_train_loss(train_loss)
+            self.storage.plot_train_loss()
 
             # 3. compare models
             if self.compare_models(trained_net):
@@ -145,17 +167,25 @@ class AlphaZero(object):
             winrate_against_random = self.compare_models(trained_net, baseline = "random")
             self.storage.update_winrate(winrate_against_random, baseline = "random")
             self.storage.plot_winrates()
-            
+
             print()
 
-    def self_play_game(self, p1, p2=None, eval=False):
+    def self_play_game(self, p1, p2=None, eval=False, idx=0):
         '''
         simulates a game between 2 players (aka networks) p1 and p2
         eval=False -> tracks and updates storage with the relevant states/policies/final values
         eval=True -> play greedy moves to compare the two networks
         '''
+        # in parallel processing, we want each game to be different...
+        np.random.seed(self.config.seed + idx)
         if p2 is None:
             p2 = p1
+        
+        # should set them to eval mode, although not sure if necessary
+        if isinstance(p1, nn.Module):
+            p1.eval()
+        if isinstance(p2, nn.Module):
+            p2.eval()
         
         board = DnBBoard(num_boxes=self.config.num_boxes)
         states1, policies1, values1 = [], [], []
@@ -170,8 +200,8 @@ class AlphaZero(object):
                 if eval or n_moves > self.config.optimal_move_cutoff:
                     move = np.argmax(pi)  # play greedily
                 else:
-                    move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
-
+                    # move = self.rng.choice(np.arange(len(pi)), p=pi)  # sample a move
+                    move = np.random.choice(np.arange(len(pi)), p=pi)
                 if not eval:
                     if board.player_turn == 0: 
                         states1.append(board.nn_state())
@@ -199,12 +229,13 @@ class AlphaZero(object):
             return winner
 
     def parallel_self_play(self, num_games, p1, p2=None, eval=False):
-        num_workers = min(8, num_games)
+        cpu_count = min(os.cpu_count(), 32) # hack for cluster
+        num_workers = min(cpu_count, num_games)
         if not eval:
-            tasks = [(p1, p2, eval) for _ in range(num_games)]
+            tasks = [(p1, p2, eval, i) for i in range(num_games)]
         else:
             # switch position
-            tasks = [(p1, p2, eval) if i%2 == 0 else (p2, p1, eval) for i in range(num_games)]
+            tasks = [(p1, p2, eval, i) if i%2 == 0 else (p2, p1, eval, i) for i in range(num_games)]
         results = [None] * num_games
 
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
