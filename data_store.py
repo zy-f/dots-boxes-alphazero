@@ -77,7 +77,7 @@ class Storage(object):
         plt.plot(iterations, random_winrates, label='Win Rate Against Random', color='g', linewidth=2)
         plt.axhline(y=0.5, color='gray', linestyle='--')
 
-        plt.ylim(0, 1)
+        plt.ylim(-0.05, 1.05)
         plt.title('Winrate Evaluation Curves', fontsize=16)
         plt.xlabel('Iterations', fontsize=14)
         plt.ylabel('Winrate', fontsize=14)
