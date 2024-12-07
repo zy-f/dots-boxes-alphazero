@@ -26,7 +26,7 @@ class AlphaZero(Player):
         # self.net = GAMES[game].Network(pretrained=True)
         self.config = config
         self.board = DnBBoard(num_boxes=config.num_boxes)
-        self.net = DnBNet(self.board.nb, len(self.board.action_mapping))
+        self.net = DnBNet(self.board.nb, len(self.board.action_mapping), num_filters=config.model_config.num_filters, num_res_blocks=config.model_config.num_res_blocks)
         self.mcts = MCTS(config.mcts_config)
 
         self.pretrained_path = f"{self.config.storage_config.ckpt_dir}/{self.config.storage_config.exp_name}/{self.config.storage_config.exp_name}.pth"
