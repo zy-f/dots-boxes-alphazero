@@ -19,9 +19,10 @@ mcts_config:
   noise_frac: 0.25
   tau_pi: 1
 storage_config:
-  buffer_size: 150_000  # ~40 * 96 * 5 * 8, retain last 5 iters # maybe 20_000?
+  buffer_size: 150_000  # ~40 * 96 * 5 * 8, retain last 5 iters
   ckpt_dir: ./___ckpt
   exp_name: size4_aug_frank
+  augmentation: True
 model_config: # also change first conv to be 5 by 5?
   num_filters: 128
   num_res_blocks: 5
