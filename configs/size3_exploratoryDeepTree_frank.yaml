@@ -7,8 +7,8 @@ trainer_hparams:
   lr: 1.0e-3
   weight_decay: 1.0e-4
   num_workers: 0
-alphazero_iterations: 100
-self_play_games_per_iter: 20 
+alphazero_iterations: 300
+self_play_games_per_iter: 32
 optimal_move_cutoff: 15  # 24 moves in total
 comparison_games_per_iter: 32
 comparison_update_thresh: 0.55
@@ -19,9 +19,9 @@ mcts_config:
   noise_frac: 0.25
   tau_pi: 1
 storage_config:
-  buffer_size: 20_000 # ~24 * 20 * 5 * 8, retain last 5 iters
+  buffer_size: 30_000 # ~24 * 32 * 5 * 8, retain last 5 iters
   ckpt_dir: ./___ckpt
-  exp_name: size3_exploratoryDeepTree_frank
+  exp_name: size3_exploratoryDeepTree_frank_v2
   augmentation: True
 model_config:
   num_filters: 64
