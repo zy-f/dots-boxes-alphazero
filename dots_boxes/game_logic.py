@@ -131,6 +131,138 @@ class DnBBoard:
             sym_states.append((''.join([str(x) for x in flat]), scores))
         return sym_states
 
+    # all the rotation stuff:
+    def move_to_action(self, move):
+        if isinstance(move, tuple) or isinstance(move, list): # user-friendly input
+            if len(move) != 2:
+                DnBBoard.illegal_move_warning()
+                return False
+            box_label, side = move
+            side = side.lower()
+            box_number = LETTERS.find(box_label)
+            if (side not in box_sides.keys()) or (box_number < 0 or box_number >= self.nb**2):
+                DnBBoard.illegal_move_warning()
+                return False
+            dy, dx = box_sides[side]
+            root_y, root_x = (box_number//self.nb)*2+1, (box_number%self.nb)*2+1
+            y = root_y+dy
+            x = root_x+dx
+            ring, side, sub_ix = self.board2ring[(root_y+dy, root_x+dx)]
+        else: # numerical action index
+            if (move < 0) or (move >= len(self.action_mapping)):
+                DnBBoard.illegal_move_warning()
+                return False
+            ring, side, sub_ix = self.action_mapping[move]
+            y, x = self.ring2board[(ring, side, sub_ix)]
+        return (y,x)
+    
+    def action_to_move(self):
+        self.action_mapping_reverse = {}
+        for move, action in enumerate(self.action_mapping):
+            ring, side, sub_ix = action
+            y, x = self.ring2board[(ring, side, sub_ix)]
+            self.action_mapping_reverse[(y,x)] = move
+
+    def rotate_90(self, state, move):
+        state, score = state
+        n = self.nb
+        # Rotate state
+        rotated_state = np.rot90(state, k=-1, axes=(0, 1))
+        rotated_state = rotated_state[:, :, [3, 0, 1, 2]]  # Adjust edge orientations
+
+        # Rotate action
+        action = self.move_to_action(move)
+        i, j = action
+        rotated_action = (j, 2 * n - i)
+        return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+
+    def rotate_180(self, state, move):
+        state, score = state
+        n = self.nb
+        # Rotate state
+        rotated_state = np.rot90(state, k=2, axes=(0, 1))
+        rotated_state = rotated_state[:, :, [2, 3, 0, 1]]  # Adjust edge orientations
+
+        # Rotate action
+        action = self.move_to_action(move)
+        i, j = action
+        rotated_action = (2 * n - i, 2 * n - j)
+        return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+
+    def rotate_270(self, state, move):
+        state, score = state
+        n = self.nb
+        # Rotate state
+        rotated_state = np.rot90(state, k=1, axes=(0, 1))
+        rotated_state = rotated_state[:, :, [1, 2, 3, 0]]  # Adjust edge orientations
+
+        # Rotate action
+        action = self.move_to_action(move)
+        i, j = action
+        rotated_action = (2 * n - j, i)
+        return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+
+    def reflect_x(self, state, move):
+        state, score = state
+        n = self.nb
+        # Reflect state
+        reflected_state = np.flip(state, axis=0)
+        reflected_state = reflected_state[:, :, [2, 1, 0, 3]]  # Swap top and bottom edges
+
+        # Reflect action
+        action = self.move_to_action(move)
+        i, j = action
+        reflected_action = (2 * n - i, j)
+        return (reflected_state, score), self.action_mapping_reverse[reflected_action]
+
+    def reflect_y(self, state, move):
+        state, score = state
+        n = self.nb
+        # Reflect state
+        reflected_state = np.flip(state, axis=1)
+        reflected_state = reflected_state[:, :, [0, 3, 2, 1]]  # Swap right and left edges
+
+        # Reflect action
+        action = self.move_to_action(move)
+        i, j = action
+        reflected_action = (i, 2 * n - j)
+        return (reflected_state, score), self.action_mapping_reverse[reflected_action]
+
+    def reconstruct_board(self, image_state):
+        image_state, score = image_state
+        n = self.nb
+        # Initialize the board with BLANK spaces
+        board = [[DnBStr.BLANK for _ in range(2 * n + 1)] for _ in range(2 * n + 1)]
+
+        # Fill in the dots
+        for i in range(0, 2 * n + 1, 2):  # Every other row
+            for j in range(0, 2 * n + 1, 2):  # Every other column
+                board[i][j] = DnBStr.DOT
+
+        # Map the edges from the image_state
+        for i in range(n):  # Iterate over boxes
+            for j in range(n):
+                top, right, bottom, left = image_state[i, j]
+                root_y, root_x = i * 2 + 1, j * 2 + 1
+
+                # Top edge
+                if top:
+                    board[root_y - 1][root_x] = DnBStr.H_EDGE
+
+                # Right edge
+                if right:
+                    board[root_y][root_x + 1] = DnBStr.V_EDGE
+
+                # Bottom edge
+                if bottom:
+                    board[root_y + 1][root_x] = DnBStr.H_EDGE
+
+                # Left edge
+                if left:
+                    board[root_y][root_x - 1] = DnBStr.V_EDGE
+
+        return board
+
     ## STATIC FUNCTIONS END
 
     def __init__(self, num_boxes=3, tree_state=None):
@@ -159,6 +291,7 @@ class DnBBoard:
         edge_pairs = DnBBoard.ring_board_pairs(self.nb)
         self.board2ring = {b_ix: r_ix for (b_ix, r_ix) in edge_pairs} 
         self.ring2board = {r_ix: b_ix for (b_ix, r_ix) in edge_pairs}
+        self.action_to_move()
     
     def clone(self):
         return self.__class__(tree_state=self.tree_state())
@@ -197,9 +330,6 @@ class DnBBoard:
         return scores_updated
     
     def play(self, move): # returns True if move is legal, False otherwise
-
-        # TODO: does not currently handle moves on occupied sides yet
-
         y, x = (None, None)
         if isinstance(move, tuple) or isinstance(move, list): # user-friendly input
             if len(move) != 2:
@@ -254,20 +384,10 @@ def debug():
     nb = 2
     board = DnBBoard(num_boxes=nb)
     print(board)
-    # move_space = nb*(nb+1) * 2
-    # moves = np.random.choice(move_space, size=10, replace=False)
-    # for move in moves:
-    #     board.play(move)
-    #     print('\n')
-    #     print(board)
-    # print('\n\n==========\n\n')
-    # for sym in board.get_symmetries():
-    #     print(DnBBoard.str_repr_board(DnBBoard.board_from_rings(sym)))
-    #     print('\n')
     while 1:
-        print(board.tree_state())
-        print(board.nn_state())
-        print(board.action_mapping)
+        # print(board.tree_state())
+        # print(board.nn_state())
+        # print(board.action_mapping)
         inp = input(f"player {board.player_turn+1}: ").strip()
         if inp.lower() == 'q':
             break
@@ -275,9 +395,25 @@ def debug():
             move = int(inp)
         except:
             move = inp.split()
+        
+        # symmetry tests
+        action = board.move_to_action(move)
+        move_int = board.action_mapping_reverse[action]
+        new_state, new_move = board.rotate_90(board.nn_state(), move_int)
+        print(new_state)
+
+        # play the move
         board.play(move)
         print(board)
         z = board.end_value()
+
+        # symmetry tests
+        new_board = DnBBoard(num_boxes=nb)
+        new_board.board = board.reconstruct_board(new_state)
+        new_board.play(new_move)
+        print("rotate_90:")
+        print(new_board)
+
         if z is not None:
             print(z)
             break
