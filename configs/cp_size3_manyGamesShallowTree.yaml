@@ -1,0 +1,24 @@
+seed: 85
+num_boxes: 3
+# device: mps # not yet implemented
+trainer_hparams:
+  batch_size: 256
+  epochs: 30
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  num_workers: 0
+alphazero_iterations: 300
+self_play_games_per_iter: 80
+optimal_move_cutoff: 15
+comparison_games_per_iter: 40
+comparison_update_thresh: 0.55
+mcts_config:
+  n_sim: 100
+  c_puct: 2
+  noise: 0.1
+  noise_frac: 0.25
+  tau_pi: 1
+storage_config:
+  buffer_size: 10_000
+  ckpt_dir: ./___ckpt
+  exp_name: size3_manyGamesShallowTree
