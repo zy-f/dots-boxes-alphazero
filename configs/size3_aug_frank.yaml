@@ -7,7 +7,7 @@ trainer_hparams:
   lr: 1.0e-3
   weight_decay: 1.0e-4
   num_workers: 0
-alphazero_iterations: 500
+alphazero_iterations: 100
 self_play_games_per_iter: 96
 optimal_move_cutoff: 15  # 24 moves in total
 comparison_games_per_iter: 32
