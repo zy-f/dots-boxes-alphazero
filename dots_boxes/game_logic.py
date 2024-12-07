@@ -171,10 +171,24 @@ class DnBBoard:
         rotated_state = rotated_state[:, :, [3, 0, 1, 2]]  # Adjust edge orientations
 
         # Rotate action
-        action = self.move_to_action(move)
-        i, j = action
-        rotated_action = (j, 2 * n - i)
-        return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+        if isinstance(move, int):
+            action = self.move_to_action(move)
+            i, j = action
+            rotated_action = (j, 2 * n - i)
+            return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+        else: # move is policy vector 
+            result = np.empty_like(move)
+            result[self.rot90_permutation] = move
+            return (rotated_state, score), result
+
+    def get_rot90_permutation(self):
+        n = self.nb
+        self.rot90_permutation = []
+        for move in range(len(self.action_mapping)):
+            action = self.move_to_action(move)
+            i, j = action
+            rotated_action = (j, 2 * n - i)
+            self.rot90_permutation.append(self.action_mapping_reverse[rotated_action])
 
     def rotate_180(self, state, move):
         state, score = state
@@ -184,10 +198,24 @@ class DnBBoard:
         rotated_state = rotated_state[:, :, [2, 3, 0, 1]]  # Adjust edge orientations
 
         # Rotate action
-        action = self.move_to_action(move)
-        i, j = action
-        rotated_action = (2 * n - i, 2 * n - j)
-        return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+        if isinstance(move, int):
+            action = self.move_to_action(move)
+            i, j = action
+            rotated_action = (2 * n - i, 2 * n - j)
+            return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+        else: # move is policy vector 
+            result = np.empty_like(move)
+            result[self.rot180_permutation] = move
+            return (rotated_state, score), result
+
+    def get_rot180_permutation(self):
+        n = self.nb
+        self.rot180_permutation = []
+        for move in range(len(self.action_mapping)):
+            action = self.move_to_action(move)
+            i, j = action
+            rotated_action = (2 * n - i, 2 * n - j)
+            self.rot180_permutation.append(self.action_mapping_reverse[rotated_action])
 
     def rotate_270(self, state, move):
         state, score = state
@@ -197,11 +225,25 @@ class DnBBoard:
         rotated_state = rotated_state[:, :, [1, 2, 3, 0]]  # Adjust edge orientations
 
         # Rotate action
-        action = self.move_to_action(move)
-        i, j = action
-        rotated_action = (2 * n - j, i)
-        return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+        if isinstance(move, int):
+            action = self.move_to_action(move)
+            i, j = action
+            rotated_action = (2 * n - j, i)
+            return (rotated_state, score), self.action_mapping_reverse[rotated_action]
+        else: # move is policy vector 
+            result = np.empty_like(move)
+            result[self.rot270_permutation] = move
+            return (rotated_state, score), result
 
+    def get_rot270_permutation(self):
+        n = self.nb
+        self.rot270_permutation = []
+        for move in range(len(self.action_mapping)):
+            action = self.move_to_action(move)
+            i, j = action
+            rotated_action = (2 * n - j, i)
+            self.rot270_permutation.append(self.action_mapping_reverse[rotated_action])
+    
     def reflect_x(self, state, move):
         state, score = state
         n = self.nb
@@ -210,10 +252,24 @@ class DnBBoard:
         reflected_state = reflected_state[:, :, [2, 1, 0, 3]]  # Swap top and bottom edges
 
         # Reflect action
-        action = self.move_to_action(move)
-        i, j = action
-        reflected_action = (2 * n - i, j)
-        return (reflected_state, score), self.action_mapping_reverse[reflected_action]
+        if isinstance(move, int):
+            action = self.move_to_action(move)
+            i, j = action
+            reflected_action = (2 * n - i, j)
+            return (reflected_state, score), self.action_mapping_reverse[reflected_action]
+        else: # move is policy vector 
+            result = np.empty_like(move)
+            result[self.reflectx_permutation] = move
+            return (reflected_state, score), result
+        
+    def get_reflectx_permutation(self):
+        n = self.nb
+        self.reflectx_permutation = []
+        for move in range(len(self.action_mapping)):
+            action = self.move_to_action(move)
+            i, j = action
+            reflected_action = (2 * n - i, j)
+            self.reflectx_permutation.append(self.action_mapping_reverse[reflected_action])
 
     def reflect_y(self, state, move):
         state, score = state
@@ -223,10 +279,24 @@ class DnBBoard:
         reflected_state = reflected_state[:, :, [0, 3, 2, 1]]  # Swap right and left edges
 
         # Reflect action
-        action = self.move_to_action(move)
-        i, j = action
-        reflected_action = (i, 2 * n - j)
-        return (reflected_state, score), self.action_mapping_reverse[reflected_action]
+        if isinstance(move, int):
+            action = self.move_to_action(move)
+            i, j = action
+            reflected_action = (i, 2 * n - j)
+            return (reflected_state, score), self.action_mapping_reverse[reflected_action]
+        else: # move is policy vector 
+            result = np.empty_like(move)
+            result[self.reflecty_permutation] = move
+            return (reflected_state, score), result
+        
+    def get_reflecty_permutation(self):
+        n = self.nb
+        self.reflecty_permutation = []
+        for move in range(len(self.action_mapping)):
+            action = self.move_to_action(move)
+            i, j = action
+            reflected_action = (i, 2 * n - j)
+            self.reflecty_permutation.append(self.action_mapping_reverse[reflected_action])
 
     def reconstruct_board(self, image_state):
         image_state, score = image_state
@@ -245,26 +315,18 @@ class DnBBoard:
                 top, right, bottom, left = image_state[i, j]
                 root_y, root_x = i * 2 + 1, j * 2 + 1
 
-                # Top edge
                 if top:
                     board[root_y - 1][root_x] = DnBStr.H_EDGE
-
-                # Right edge
                 if right:
                     board[root_y][root_x + 1] = DnBStr.V_EDGE
-
-                # Bottom edge
                 if bottom:
                     board[root_y + 1][root_x] = DnBStr.H_EDGE
-
-                # Left edge
                 if left:
                     board[root_y][root_x - 1] = DnBStr.V_EDGE
-
         return board
 
-    ## STATIC FUNCTIONS END
 
+    ## STATIC FUNCTIONS END
     def __init__(self, num_boxes=3, tree_state=None):
         if tree_state is not None:
             ring_state, scores = tree_state
@@ -292,6 +354,11 @@ class DnBBoard:
         self.board2ring = {b_ix: r_ix for (b_ix, r_ix) in edge_pairs} 
         self.ring2board = {r_ix: b_ix for (b_ix, r_ix) in edge_pairs}
         self.action_to_move()
+        self.get_rot90_permutation()
+        self.get_rot180_permutation()
+        self.get_rot270_permutation()
+        self.get_reflectx_permutation()
+        self.get_reflecty_permutation()
     
     def clone(self):
         return self.__class__(tree_state=self.tree_state())

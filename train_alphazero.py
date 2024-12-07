@@ -124,7 +124,7 @@ class AlphaZero(object):
         Use easydict to create hyperparameter config! (JSON-style dict)
         '''
         self.config = config
-        self.storage = Storage(config.storage_config)
+        self.storage = Storage(config.storage_config, config.num_boxes)
         self.board = DnBBoard(num_boxes=config.num_boxes)
         self.current_net = DnBNet(self.board.nb, len(self.board.action_mapping),
                                   num_filters=config.model_config.num_filters, 

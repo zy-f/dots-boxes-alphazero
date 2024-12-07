@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from dots_boxes.game_logic import *
 
 class DnBStorageDataset(Dataset):
     def __init__(self, states, policies, values):
@@ -29,7 +30,7 @@ class DnBStorageDataset(Dataset):
         )
     
 class Storage(object):
-    def __init__(self, config):
+    def __init__(self, config, board_size):
         '''
         Initialize the storage object with relevant stuff idk
         Needs to track the running buffer of data and the current best network
@@ -39,6 +40,7 @@ class Storage(object):
         - exp_name: experiment name (sets the save filename for the network)
         '''
         self.cfg = config
+        self.board = DnBBoard(num_boxes=board_size)
         self.buffer = {"states": [], "policies": [], "values": []}
         self.best_net = None
         self.folder = f"{self.cfg.ckpt_dir}/{self.cfg.exp_name}"
@@ -50,6 +52,9 @@ class Storage(object):
             file_path = os.path.join(self.folder, file_name)
             with open(file_path, 'w') as file:
                 pass
+        
+        augmentation = self.cfg.get("augmentation", False)
+        print(f"\nUsing augmentation: {augmentation}")
     
     def update_winrate(self, winrate, baseline):
         with open(os.path.join(self.folder, f"winrate_against_{baseline}.txt"), 'a') as file:
@@ -128,14 +133,16 @@ class Storage(object):
         states, policies, and values, are parallel lists or arrays
         load these into an appropriate structure, managing the data buffer as necessary
         '''
-
-        # TODO: do we only get one value per game?
-        # TODO: would the inputs be tensors or arrays?
-        # TODO: don't we also need the predicted action probabilities and the predicted value?
-
-        self.buffer["states"].extend(states)
-        self.buffer["policies"].extend(policies)
-        self.buffer["values"].extend(values)
+        augmentation = self.cfg.get("augmentation", False)
+        if augmentation:
+            new_states, new_policies, new_values = self.add_symmetrical_data(states, policies, values)
+            self.buffer["states"].extend(new_states)
+            self.buffer["policies"].extend(new_policies)
+            self.buffer["values"].extend(new_values)
+        else:
+            self.buffer["states"].extend(states)
+            self.buffer["policies"].extend(policies)
+            self.buffer["values"].extend(values)
 
         if self.cfg.buffer_size > 0:
             current_size = len(self.buffer["states"])
@@ -144,6 +151,31 @@ class Storage(object):
                 self.buffer["states"] = self.buffer["states"][overflow:]
                 self.buffer["policies"] = self.buffer["policies"][overflow:]
                 self.buffer["values"] = self.buffer["values"][overflow:]
+    
+    def add_symmetrical_data(self, states, policies, values):
+        new_states = []
+        new_policies = []
+        new_values = []
+
+        for state, policy, value in zip(states, policies, values):
+            # collect all transformations
+            transformations = [
+                (state, policy),  # Original
+                self.board.rotate_90(state, policy),
+                self.board.rotate_180(state, policy),
+                self.board.rotate_270(state, policy),
+                self.board.reflect_x(state, policy),
+                self.board.reflect_y(state, policy),
+                self.board.reflect_y(*self.board.rotate_90(state, policy)),  # 90° rotation + reflect y
+                self.board.reflect_x(*self.board.rotate_270(state, policy)),  # 270° rotation + reflect x
+            ]
+
+            for transformed_state, transformed_policy in transformations:
+                new_states.append(transformed_state)
+                new_policies.append(transformed_policy)
+                new_values.append(value)
+
+        return new_states, new_policies, new_values
 
 
 def debug():
