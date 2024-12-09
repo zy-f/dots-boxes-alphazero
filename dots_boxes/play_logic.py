@@ -7,6 +7,8 @@ PLAYER_TYPES = {}
 class Player:
     is_human = False
     label = "null"
+    def __init__(self, *args):
+        pass
     def move(self, board):
         pass
 
@@ -53,7 +55,7 @@ PLAYER_TYPES['random'] = RandomBaselineBot
 def makesize(size):
     try:
         size = int(size)
-        if size < 2 or size > 7:
+        if size < 2 or size > 4:
             size = -1
     except:
         size = -1
@@ -61,7 +63,7 @@ def makesize(size):
 
 
 class DnBGame:
-    def __init__(self, config, player_opts=PLAYER_TYPES):
+    def __init__(self, player_opts=PLAYER_TYPES):
         print("Let's play dots and boxes!")
         print("Player options: " + ', '.join([f'"{p}"' for p in player_opts]))
         p1 = p2 = None
@@ -75,13 +77,9 @@ class DnBGame:
             p2 = input("Player 2: ")
         board_size = -1
         while board_size < 1:
-            board_size = makesize(input("Board size [2-7]: "))
+            board_size = makesize(input("Board size [2-4]: "))
         self.board = DnBBoard(num_boxes=board_size)
-        self.players = [
-            player_opts[p1](config) if p1 == "alphazero" else player_opts[p1](),
-            player_opts[p2](config) if p2 == "alphazero" else player_opts[p2](),
-
-        ]
+        self.players = [player_opts[p1](board_size), player_opts[p2](board_size)]
             
         print('--- Instructions ---')
         print("Move format: <box label> [space] <side ([t]op/[b]ottom/[l]eft/[r]ight)>")

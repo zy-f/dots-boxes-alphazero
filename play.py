@@ -17,25 +17,24 @@ GAMES = {
 class Player:
     is_human = False
     label = "null"
+    def __init__(self, *args):
+        pass
     def move(self, board):
         pass
 
 class AlphaZero(Player):
     label = "AlphaZero (bot)"
-    def __init__(self, config, game='dnb'):
-        # self.net = GAMES[game].Network(pretrained=True)
-        self.config = config
-        self.board = DnBBoard(num_boxes=config.num_boxes)
-        
-        if self.config.model_config.get("fc", False):
-            self.net = DnBNetFC(self.board.nb, len(self.board.action_mapping))
-        else:
-            self.net = DnBNet(self.board.nb, len(self.board.action_mapping),
-                                    num_filters=config.model_config.num_filters, 
-                                    num_res_blocks=config.model_config.num_res_blocks)
+    def __init__(self, num_boxes, game='dnb'):
+        self.board = DnBBoard(num_boxes=num_boxes)
+        root_path = f"final_models/size{num_boxes}_aug_final"
+        with open(root_path+".yaml", 'r') as f:
+            config = edict(yaml.safe_load(f))
+        self.net = DnBNet(self.board.nb, len(self.board.action_mapping),
+                          num_filters=config.model_config.num_filters, 
+                          num_res_blocks=config.model_config.num_res_blocks)
         
         self.mcts = MCTS(config.mcts_config)
-        self.pretrained_path = f"{self.config.storage_config.ckpt_dir}/{self.config.storage_config.exp_name}/{self.config.storage_config.exp_name}.pth"
+        self.pretrained_path = root_path+".pth"
         checkpoint = torch.load(self.pretrained_path, map_location=torch.device('cpu'))
         self.net.load_state_dict(checkpoint)
 
@@ -44,24 +43,24 @@ class AlphaZero(Player):
         return np.argmax(policy)
 
 
-def play(config, game='dnb', verbose=False):
+def play(game='dnb'):
     '''
     We'll probably want either a regular or command-line argument to choose 
     the trained network to play against.
     '''
     player_options = GAMES[game].PLAYER_TYPES
     player_options['alphazero'] = AlphaZero
-    game = GAMES[game].Game(config)
+    show_computer_moves = input('Show computer moves (Y/n)? ')
+    verbose = show_computer_moves.lower().startswith('y')
+    game = GAMES[game].Game()
     while not game.finished():
         if verbose or game.human_turn():
+            print()
             game.display()
         game.play_turn()
+    print("\n\n--- Game End ---")
     game.display()
 
 
 if __name__ == '__main__':
-    assert len(sys.argv) > 1
-    config_path = sys.argv[1]
-    with open(config_path, 'r') as f:
-        config = edict(yaml.safe_load(f))
-    play(config)
+    play()
