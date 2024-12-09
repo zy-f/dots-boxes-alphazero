@@ -1,6 +1,6 @@
 seed: 85
 num_boxes: 3
-device: cpu
+device: cuda
 trainer_hparams:
   batch_size: 256  # trying something smaller
   epochs: 15
