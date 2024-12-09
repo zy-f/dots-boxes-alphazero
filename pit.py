@@ -19,6 +19,8 @@ if __name__ == '__main__':
     elif player1 == "greedy":
         player1 = GreedyBaselineBot()
     else:
+        with open(player1, 'r') as f:
+          player1 = edict(yaml.safe_load(f))
         player1 = AlphaZero(player1)
     
     if player2 == "random":
@@ -26,6 +28,8 @@ if __name__ == '__main__':
     elif player2 == "greedy":
         player2 = GreedyBaselineBot()
     else:
+        with open(player2, 'r') as f:
+            player2 = edict(yaml.safe_load(f))
         player2 = AlphaZero(player2)
 
     players = [player1, player2]
