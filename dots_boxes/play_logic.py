@@ -70,11 +70,11 @@ class DnBGame:
         while p1 not in player_opts:
             if p1 is not None:
                 print("Invalid option, please try again")
-            p1 = input("Player 1: ")
+            p1 = input("Player 1: ").lower()
         while p2 not in player_opts:
             if p2 is not None:
                 print("Invalid option, please try again")
-            p2 = input("Player 2: ")
+            p2 = input("Player 2: ").lower()
         board_size = -1
         while board_size < 1:
             board_size = makesize(input("Board size [2-4]: "))
