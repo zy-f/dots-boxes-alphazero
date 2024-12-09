@@ -126,9 +126,16 @@ class AlphaZero(object):
         self.config = config
         self.storage = Storage(config.storage_config, config.num_boxes)
         self.board = DnBBoard(num_boxes=config.num_boxes)
-        self.current_net = DnBNet(self.board.nb, len(self.board.action_mapping),
-                                  num_filters=config.model_config.num_filters, 
-                                  num_res_blocks=config.model_config.num_res_blocks)
+
+        if self.config.model_config.get("fc", False):
+            self.current_net = DnBNetFC(self.board.nb, len(self.board.action_mapping))
+        else:
+            self.current_net = DnBNet(self.board.nb, len(self.board.action_mapping),
+                                    num_filters=config.model_config.num_filters, 
+                                    num_res_blocks=config.model_config.num_res_blocks)
+        trainable_params = sum(p.numel() for p in self.current_net.parameters() if p.requires_grad)
+        print(f"Trainable parameters: {trainable_params}\n")
+
         self.storage.save_network(self.current_net)
         self.trainer = Trainer(config.trainer_hparams, device=config.device)
         self.mcts = MCTS(config.mcts_config)

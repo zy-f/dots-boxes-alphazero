@@ -141,5 +141,100 @@ def debug():
             break
 
 
+class DnBNetFC(nn.Module):
+    def __init__(self, board_size, action_space, dim=256, dropout=0.3):
+        super(DnBNetFC, self).__init__()
+
+        print(f"\nUsing a fully connected architecture with hidden dimension={dim} and dropout={dropout}.\n")
+        self.board_size = board_size
+        self.action_space = action_space
+
+        input_size = board_size * board_size * 4 + 2
+        self.fc1 = nn.Linear(input_size, dim)
+        self.bn1 = nn.BatchNorm1d(dim)
+
+        self.fc2 = nn.Linear(dim, dim)
+        self.bn2 = nn.BatchNorm1d(dim)
+
+        self.fc3 = nn.Linear(dim, dim)
+        self.bn3 = nn.BatchNorm1d(dim)
+
+        self.fc4 = nn.Linear(dim, dim)
+        self.bn4 = nn.BatchNorm1d(dim)
+
+        self.fc5 = nn.Linear(dim, dim)
+        self.bn5 = nn.BatchNorm1d(dim)
+
+        self.fc6 = nn.Linear(dim, dim)
+        self.bn6 = nn.BatchNorm1d(dim)
+
+        self.policy_fc = nn.Linear(dim, action_space)
+        self.value_fc = nn.Linear(dim, 1)
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, state):
+        """
+        Parameters:
+        state is a tuple of:
+        - x: torch.Tensor, batch of board states with shape (batch_size, board_size, board_size, 4).
+        - s: torch.Tensor, batch of scores (i.e. [my score, their score]) with shape (batch_size, 2).
+
+        Returns:
+        - p: torch.Tensor, policy vector of shape (batch_size, action_space).
+        - z: torch.Tensor, scalar state evaluation of shape (batch_size, 1).
+        """
+        x, s = state
+        s = s / (self.board_size * self.board_size)  # Normalize scores
+
+        batch_size = x.size(0)
+        x = x.contiguous().view(batch_size, -1)  # Flatten the board state
+        x = torch.cat((x, s), dim=1)  # Combine board state and scores
+
+        x = F.relu(self.bn1(self.fc1(x)))
+        x = self.dropout(x)
+
+        x = F.relu(self.bn2(self.fc2(x)))
+        x = self.dropout(x)
+
+        x = F.relu(self.bn3(self.fc3(x)))
+        x = self.dropout(x)
+
+        x = F.relu(self.bn4(self.fc4(x)))
+        x = self.dropout(x)
+
+        x = F.relu(self.bn5(self.fc5(x)))
+        x = self.dropout(x)
+
+        x = F.relu(self.bn6(self.fc6(x)))
+        x = self.dropout(x)
+
+        # policy
+        p = F.log_softmax(self.policy_fc(x), dim=1)
+
+        # value
+        v = torch.tanh(self.value_fc(x)).squeeze()
+
+        return p, v
+    
+    def predict(self, board_state):
+        """
+        Parameters:
+        - board_state: tuple, a single (board state, scores) pair.
+
+        Returns:
+        - p: np.ndarray, policy vector of probabilities for the action space.
+        - z: np.ndarray, scalar state evaluation.
+        """
+        board, score = board_state
+        board_tensor = torch.tensor(board, dtype=torch.float32).unsqueeze(0)
+        score_tensor = torch.tensor(score, dtype=torch.float32).unsqueeze(0)
+        self.eval()
+        with torch.no_grad():
+            p, z = self.forward((board_tensor, score_tensor))
+            p = torch.exp(p)
+        
+        return p.squeeze(0).cpu().numpy(), z.item()
+
 if __name__ == "__main__":
     debug()
