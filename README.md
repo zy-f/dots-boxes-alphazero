@@ -1,5 +1,6 @@
 # AlphaZero for Dots and Boxes
 Final project for CS238 in Fall 2024 by Renee, Frank, and Christos.
+
 An implementation of AlphaZero for the game of Dots and Boxes.
 
 ## Setup
