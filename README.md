@@ -3,6 +3,8 @@ Final project for CS238 in Fall 2024 by Renee, Frank, and Christos.
 
 An implementation of AlphaZero for the game of Dots and Boxes.
 
+[Final report in repo](https://github.com/zy-f/dots-boxes-alphazero/blob/main/CS238_Project_FinalReport.pdf)
+
 ## Setup
 The `main` branch is designed to make it easy to play with our final models.
 For model training purposes, please switch to the `dev` branch.
